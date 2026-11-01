@@ -13,7 +13,7 @@ export const modules = [
 export const recruitmentModules = [
   { id: 'discord', name: 'Discord de recruitment', description: 'Credenciales propias de este bot y autorización de oficiales.', fields: modules[0].fields.filter(f => ['DISCORD_TOKEN','DISCORD_CLIENT_ID','DISCORD_GUILD_ID','OFFICER_ROLE_IDS'].includes(f.key)) },
   { id: 'recruitment', name: 'Solicitudes y canales', description: 'Categorías de applies y raiders, y canal de transcripciones.', fields: [field('APPLY_CATEGORY_ID', 'Categoría de solicitudes', 'id'), field('RAIDER_CATEGORY_ID', 'Categoría de raiders', 'id'), field('ENTRY_CHANNEL_ID', 'Canal de transcripciones', 'id')] },
-  { id: 'messages', name: 'Mensajes de recruitment', description: 'Vacío usa el texto predeterminado del bot. Variables: {user}, {character}, {realm}, {server} y {channel}; su disponibilidad depende del mensaje.', fields: [field('APPLY_RECEIVED_MESSAGE', 'Solicitud recibida'), field('APPLY_ACCEPTED_MESSAGE', 'Solicitud aceptada'), field('APPLY_REJECTED_MESSAGE', 'Solicitud rechazada')] },
+  { id: 'messages', name: 'Mensajes de recruitment', description: 'Vacío usa el texto predeterminado del bot. Variables: {user}, {character}, {realm}, {server} y {channel}; su disponibilidad depende del mensaje.', fields: [field('APPLY_RECEIVED_MESSAGE', 'Solicitud recibida', 'message'), field('APPLY_ACCEPTED_MESSAGE', 'Solicitud aceptada', 'message'), field('APPLY_REJECTED_MESSAGE', 'Solicitud rechazada', 'message')] },
   { id: 'questions', name: 'Preguntas del apply', description: 'Vacío conserva la pregunta predeterminada del bot.', fields: [field('APPLY_QUESTION_CHARACTER', 'Personaje'), field('APPLY_QUESTION_REALM', 'Reino'), field('APPLY_QUESTION_CLASS', 'Clase y especialización'), field('APPLY_QUESTION_EXPERIENCE', 'Experiencia'), field('APPLY_QUESTION_AVAILABILITY', 'Disponibilidad y motivación')] },
   { id: 'integration', name: 'Integración con WoW Sync', description: 'DATA_DIR es la carpeta del host usada por Compose. DATABASE_PATH es la ruta del proceso; Compose la inyecta como /app/wow-role-sync-data/whitebird-wow-roles.sqlite y prevalece sobre el .env.', fields: [field('WOW_ROLE_SYNC_DATA_DIR', 'Carpeta data de sync en el host'), field('WOW_ROLE_SYNC_DATABASE_PATH', 'Ruta SQLite compartida (ejecución directa)'), field('WOW_ROLE_SYNC_BOT_ID', 'ID de usuario del bot de sync', 'id')] }
 ];
@@ -35,7 +35,7 @@ export function update(text, changes, selectedModules = modules) {
   const env = parse(text);
   for (const [key, value] of Object.entries(changes)) {
     const f = fields.find(f => f.key === key);
-    if (!f || typeof value !== 'string' || value.length > 8000 || /[\r\n\0]/.test(value)) throw Error(`Valor no válido: ${key}`);
+    if (!f || typeof value !== 'string' || value.length > 8000 || (f.type === 'message' ? /[\r\0]/ : /[\r\n\0]/).test(value)) throw Error(`Valor no válido: ${key}`);
     if (value) {
       if (f.type === 'id' && !/^\d{17,20}$/.test(value)) throw Error(`${f.label}: usa un ID de Discord válido.`);
       if (f.type === 'ids' && !value.split(',').every(v => /^\d{17,20}$/.test(v.trim()))) throw Error('Roles de oficiales: IDs no válidos.');
@@ -60,7 +60,7 @@ export function update(text, changes, selectedModules = modules) {
     if (!quote) throw Error(`${key}: combinación de comillas no admitida.`);
     const line = `${key}=${quote}${value}${quote}`;
     if (parse(line)[key] !== value) throw Error(`${key}: el valor no puede representarse sin alterarlo en dotenv.`);
-    const pattern = new RegExp(`^(?:export\\s+)?${key}\\s*=.*$`, 'gm');
+    const pattern = new RegExp(`^(?:export[ \t]+)?${key}[ \t]*=[ \t]*(?:"[^"]*"|'[^']*'|\x60[^\x60]*\x60|[^\r\n]*)[^\r\n]*$`, 'gm');
     if (pattern.test(result)) result = result.replace(pattern, () => line);
     else result += `${result.endsWith('\n') ? '' : '\n'}${line}\n`;
   }

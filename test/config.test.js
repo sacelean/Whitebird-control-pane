@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parse } from 'dotenv';
-import { update, view } from '../config.js';
+import { update, view, recruitmentModules } from '../config.js';
 test('no devuelve credenciales y distingue su presencia', () => {
   const data = view('DISCORD_TOKEN=super-secret\nBLIZZARD_CLIENT_SECRET=hidden');
   assert.equal(data.secrets.DISCORD_TOKEN, true);
@@ -31,4 +31,20 @@ test('rechaza inyección, claves no admitidas y valores inválidos', () => {
 test('rechaza IDs de roles compartidos y permite borrar un secreto explícitamente', () => {
   assert.throws(() => update('WOW_DEFAULT_RANK_ROLE_ID=123456789012345678', { WOW_ROSTER_ROLE_ID:'123456789012345678' }));
   assert.equal(parse(update('DISCORD_TOKEN=old', { DISCORD_TOKEN:'' })).DISCORD_TOKEN, '');
+});
+
+test('mensajes de recruitment: conserva saltos de línea y reemplaza el bloque completo', () => {
+  const original = '# Mensajes\nAPPLY_RECEIVED_MESSAGE="Anterior"\nOTHER=conservar\n';
+  const message = '**Hola {user}**\nBienvenido a {server}.\nVARIABLE=texto del mensaje';
+  const first = update(original, { APPLY_RECEIVED_MESSAGE: message }, recruitmentModules);
+  assert.equal(view(first, recruitmentModules).values.APPLY_RECEIVED_MESSAGE, message);
+  assert.equal(parse(first).OTHER, 'conservar');
+  assert.equal(parse(first).VARIABLE, undefined);
+  const second = update(first, { APPLY_RECEIVED_MESSAGE: 'Nuevo\nMensaje' }, recruitmentModules);
+  assert.equal(parse(second).APPLY_RECEIVED_MESSAGE, 'Nuevo\nMensaje');
+  assert.equal(parse(second).OTHER, 'conservar');
+  assert.ok(!second.includes('Bienvenido'));
+  const cleared = update(second, { APPLY_RECEIVED_MESSAGE: '' }, recruitmentModules);
+  assert.equal(parse(cleared).APPLY_RECEIVED_MESSAGE, '');
+  assert.equal(parse(cleared).OTHER, 'conservar');
 });

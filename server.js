@@ -100,10 +100,10 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { ok: true, message: 'Guardado. Recrea el contenedor del bot para aplicar los cambios.' });
       } finally { saving = false; }
     }
-    const files = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
+    const files = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'], '/logo.png': ['logo.png', 'image/png'] };
     if (req.method === 'GET' && files[req.url]) {
       const [file, type] = files[req.url];
-      res.setHeader('Content-Type', `${type}; charset=utf-8`); return res.end(await readFile(join(here, 'public', file)));
+      res.setHeader('Content-Type', type.startsWith('text/') ? `${type}; charset=utf-8` : type); return res.end(await readFile(join(here, 'public', file)));
     }
     send(res, 404, { error: 'No encontrado.' });
   } catch (error) { send(res, 400, { error: error.code ? 'No se pudo acceder a la configuración. Comprueba permisos y rutas.' : error.message }); }

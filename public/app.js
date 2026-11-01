@@ -3,7 +3,7 @@ const pending = {};
 const $ = id => document.getElementById(id);
 const el = (tag, text, className) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (className) node.className = className; return node; };
 function message(text, error = false) { $('notice').textContent = text; $('notice').className = error ? 'error' : ''; }
-function dirty() { document.querySelectorAll('#content input, #content textarea, #content label button').forEach(node => { node.disabled = busy; }); $('restart').disabled = busy || !config?.restartEnabled || Object.keys(pending).length > 0; $('restart').title = !config?.restartEnabled ? 'Activa PANEL_RESTART_ENABLED en el servidor' : Object.keys(pending).length ? 'Guarda los cambios antes de reiniciar' : 'Recrea únicamente el bot seleccionado'; $('project').disabled = busy; $('reload').disabled = busy; const count = Object.keys(pending).length; $('changes').textContent = count ? `${count} ajuste${count === 1 ? '' : 's'} sin guardar` : 'Sin cambios pendientes'; $('save').disabled = !count || busy; $('discard').disabled = !count || busy; }
+function dirty() { document.querySelectorAll('#content input, #content textarea, #content label button, #content .editor-toolbar select').forEach(node => { node.disabled = busy; }); $('restart').disabled = busy || !config?.restartEnabled || Object.keys(pending).length > 0; $('restart').title = !config?.restartEnabled ? 'Activa PANEL_RESTART_ENABLED en el servidor' : Object.keys(pending).length ? 'Guarda los cambios antes de reiniciar' : 'Recrea únicamente el bot seleccionado'; $('project').disabled = busy; $('reload').disabled = busy; const count = Object.keys(pending).length; $('changes').textContent = count ? `${count} ajuste${count === 1 ? '' : 's'} sin guardar` : 'Sin cambios pendientes'; $('save').disabled = !count || busy; $('discard').disabled = !count || busy; }
 function readiness(id) {
   const v = config.values, s = config.secrets;
   if (config.project.id === 'roulette' && id !== 'discord') return 'Gestión en Discord';
@@ -46,6 +46,34 @@ function renderState(container, scope = 'all') {
   if (['all','audit'].includes(scope)) container.append(table('Destino del informe de raiders', ['Canal Discord'], s.raiderDestination.map(r => [r.channel_id])));
   if (['all','roles'].includes(scope)) container.append(table('Últimos cambios de roles', ['Fecha','Personaje','Acción','Rol'], s.history.map(r => [r.created_at,r.character_name,r.action,r.role_name])));
 }
+function messageToolbar(input) {
+  const toolbar = el('div', undefined, 'editor-toolbar');
+  toolbar.setAttribute('role', 'toolbar');
+  toolbar.setAttribute('aria-label', 'Formato del mensaje');
+  const insert = (before, after = '', fallback = '') => {
+    const start = input.selectionStart, end = input.selectionEnd;
+    const selected = input.value.slice(start, end) || fallback;
+    input.setRangeText(before + selected + after, start, end, 'end');
+    input.focus();
+    input.setSelectionRange(start + before.length, start + before.length + selected.length);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  for (const [name, caption, marker] of [['Negrita', 'B', '**'], ['Cursiva', 'I', '*'], ['Subrayado', 'U', '__'], ['Tachado', 'S', '~~'], ['Código', '</>', '`']]) {
+    const button = el('button', caption);
+    button.type = 'button'; button.title = name; button.setAttribute('aria-label', name);
+    button.onclick = () => insert(marker, marker, 'texto');
+    toolbar.append(button);
+  }
+  const variables = el('select');
+  variables.setAttribute('aria-label', 'Insertar variable');
+  const placeholder = el('option', 'Insertar variable…'); placeholder.value = ''; variables.append(placeholder);
+  for (const name of ['user', 'character', 'realm', 'server', 'channel']) {
+    const option = el('option', `{${name}}`); option.value = `{${name}}`; variables.append(option);
+  }
+  variables.onchange = () => { if (variables.value) insert(variables.value); variables.value = ''; };
+  toolbar.append(variables);
+  return toolbar;
+}
 function render() {
   if (!config) return;
   const content = $('content'); content.replaceChildren();
@@ -70,13 +98,20 @@ function render() {
     if (module.fields.length) {
       const form = el('section', undefined, 'panel'), grid = el('div', undefined, 'form-grid');
       module.fields.forEach(f => {
-        const label = el('label', f.label), input = el(['json','ranks'].includes(f.type) ? 'textarea' : 'input');
+        const label = el('label', f.label), input = el(['json','ranks','message'].includes(f.type) ? 'textarea' : 'input');
         if (input.tagName === 'INPUT') input.type = f.type === 'secret' ? 'password' : 'text';
         input.id = f.key; input.name = f.key; input.autocomplete = 'off'; input.spellcheck = false;
         input.value = pending[f.key] ?? config.values[f.key] ?? '';
         if (f.type === 'secret') input.placeholder = config.secrets[f.key] ? 'Guardado · escribe para sustituir' : 'Sin configurar';
         input.addEventListener('input', () => { if (input.value === (config.values[f.key] ?? '') && f.type !== 'secret') delete pending[f.key]; else if (f.type === 'secret' && !input.value) delete pending[f.key]; else pending[f.key] = input.value; dirty(); });
-        label.append(input, el('small',f.key));
+        if (f.type === 'message') {
+          label.classList.add('message-field');
+          const editor = el('div', undefined, 'message-editor');
+          input.rows = 9; input.maxLength = 8000;
+          input.placeholder = 'Vacío: usar el mensaje predeterminado del bot';
+          editor.append(messageToolbar(input), input);
+          label.append(editor, el('small', 'Formato Markdown de Discord · Las variables disponibles dependen del mensaje.'), el('small', f.key));
+        } else label.append(input, el('small',f.key));
         if (f.type === 'secret') { const clear = el('button', 'Eliminar credencial guardada', 'secondary'); clear.type = 'button'; clear.onclick = e => { e.preventDefault(); pending[f.key] = ''; input.value = ''; input.placeholder = 'Se eliminará al guardar'; dirty(); }; label.append(clear); }
         grid.append(label);
       }); form.append(grid); content.append(form);
