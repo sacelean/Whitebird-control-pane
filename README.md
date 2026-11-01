@@ -94,3 +94,10 @@ PANEL_ROULETTE_ENV_PATH=/ruta/whitebird-wow-wheel/.env npm start
 ```
 
 Aunque el bot permite comandos globales sin `DISCORD_GUILD_ID`, para visualizar SQLite en el panel debes indicar el servidor. Después de guardar ruleta, ejecuta desde su proyecto `docker compose up -d --force-recreate whitebird-wow-wheel`.
+
+## CI/CD en OCI
+
+La pipeline de [GitHub Actions](.github/workflows/ci-cd.yml) verifica las PR y
+los cambios en `main`, y despliega por SSH tras superar las pruebas.
+La [guía de despliegue](deploy/README.md) explica la preparación de la máquina,
+los secrets de GitHub, el servicio systemd y la recuperación automática.

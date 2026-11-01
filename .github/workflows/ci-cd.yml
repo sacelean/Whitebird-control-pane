@@ -1,0 +1,70 @@
+name: CI / CD OCI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Empaquetar aplicación
+        run: tar -czf panel.tar.gz package.json package-lock.json server.js config.js public deploy
+      - uses: actions/upload-artifact@v4
+        with:
+          name: panel
+          path: panel.tar.gz
+          retention-days: 7
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: oci-production
+      cancel-in-progress: false
+    env:
+      OCI_HOST: ${{ secrets.OCI_HOST }}
+      OCI_USER: ${{ secrets.OCI_USER }}
+      OCI_SSH_PORT: ${{ vars.OCI_SSH_PORT || '22' }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: panel
+      - name: Configurar SSH
+        env:
+          SSH_KEY: ${{ secrets.OCI_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.OCI_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$OCI_HOST" && test -n "$OCI_USER"
+          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Transferir y desplegar
+        run: |
+          set -euo pipefail
+          release="${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          remote="${OCI_USER}@${OCI_HOST}"
+          ssh_opts=(-p "$OCI_SSH_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
+          ssh "${ssh_opts[@]}" "$remote" "mkdir -p /opt/whitebird-control-panel/incoming/$release"
+          scp -P "$OCI_SSH_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes panel.tar.gz "$remote:/opt/whitebird-control-panel/incoming/$release/panel.tar.gz"
+          ssh "${ssh_opts[@]}" "$remote" "set -eu; cd /opt/whitebird-control-panel/incoming/$release; tar -xzf panel.tar.gz; bash deploy/release.sh '$release'"
+      - name: Borrar clave local
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519
