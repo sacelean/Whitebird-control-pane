@@ -104,3 +104,9 @@ code { color: #a3d6ff; overflow-wrap: anywhere; }
 .editor-toolbar select { max-width: 100%; padding: 7px 9px; border: 1px solid #3a4c69; border-radius: 4px; background: #0a1426; color: #d9e5f1; font: inherit; }
 .message-editor textarea { min-height: 220px; margin: 0; border: 0; border-radius: 0; padding: 16px; font: 14px/1.7 ui-sans-serif, system-ui, sans-serif; }
 .message-editor textarea:focus { outline-offset: -2px; }
+
+.daily-report { white-space: pre-wrap; overflow-wrap: anywhere; background: #091323; border: 1px solid #354966; padding: 20px; font: 13px/1.8 ui-monospace, monospace; }
+.audit-filters { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; margin: 20px 0; }
+.audit-filters label:first-child { flex: 1; min-width: 180px; }
+.audit-filters select { display: block; padding: 12px; margin-top: 10px; background: #091323; border: 1px solid #354966; border-radius: 4px; color: #eef2fa; }
+.audit-pagination { display: flex; gap: 12px; }

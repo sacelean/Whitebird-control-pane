@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import { readAudit } from './audit.js';
+import { dailyReport } from './daily-report.js';
 import http from 'node:http';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -54,6 +56,13 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, list);
     }
     const project = projects.find(p => p.id === (url.searchParams.get('project') || 'wow'));
+    if (['/api/daily-report', '/api/audit'].includes(url.pathname) && req.method === 'GET') {
+      if (project?.id !== 'wow') return send(res, 404, { error: 'Disponible solo para WoW Role Sync.' });
+      const env = parse(await readEnv(project));
+      if (url.pathname === '/api/daily-report') return send(res, 200, await dailyReport(env, project.base, await state(env, project)));
+      try { return send(res, 200, readAudit(env, project.base, url.searchParams)); }
+      catch { return send(res, 503, { error: 'No se pudieron consultar los registros. Comprueba SQLite y los permisos.' }); }
+    }
     if (url.pathname === '/api/restart' && req.method === 'POST') {
       if (req.headers['x-panel-csrf'] !== csrf) return send(res, 403, { error: 'Recarga el panel para reiniciar.' });
       if (!project) return send(res, 404, { error: 'Bot desconocido.' });

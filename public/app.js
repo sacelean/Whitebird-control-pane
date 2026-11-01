@@ -8,6 +8,7 @@ function readiness(id) {
   const v = config.values, s = config.secrets;
   if (config.project.id === 'roulette' && id !== 'discord') return 'Gestión en Discord';
   if (config.project.id === 'recruitment' && id !== 'discord') return 'Configuración guardada';
+  if (id === 'daily-report') return 'Vista previa y registros';
   if (id === 'discord') return s.DISCORD_TOKEN && v.DISCORD_GUILD_ID ? 'Credenciales guardadas' : 'Por configurar';
   if (id === 'roles') return v.BLIZZARD_CLIENT_ID && s.BLIZZARD_CLIENT_SECRET && v.WOW_GUILD_SLUG && v.WOW_GUILD_REALM_SLUG ? 'Datos guardados' : 'Por configurar';
   if (id === 'roster') return v.WOW_ROSTER_ROLE_ID ? 'ID configurado' : 'Desactivado';
@@ -74,6 +75,58 @@ function messageToolbar(input) {
   toolbar.append(variables);
   return toolbar;
 }
+function renderRecords(container) {
+  const preview = el('section', undefined, 'panel');
+  preview.append(el('h2', 'Vista previa del informe diario'), el('p', 'Calcula los cambios previstos con datos actuales de Blizzard y Discord. No modifica roles, canales ni SQLite. No simula felicitaciones ni fallos al aplicar cambios.'));
+  const generate = el('button', 'Generar vista previa', 'secondary'), status = el('p');
+  status.setAttribute('role', 'status');
+  const output = el('pre', '', 'daily-report'); output.hidden = true;
+  generate.onclick = async () => {
+    generate.disabled = true; status.textContent = 'Calculando… Puede tardar hasta dos minutos.'; output.hidden = true;
+    try {
+      const response = await fetch('/api/daily-report?project=wow'), data = await response.json();
+      if (!response.ok) throw Error(data.error);
+      status.textContent = data.available ? `Calculado: ${new Date(data.timestamp).toLocaleString('es-ES')}` : data.message;
+      if (data.available) { output.textContent = data.content; output.hidden = false; }
+    } catch { status.textContent = 'No se pudo generar la vista previa.'; }
+    finally { generate.disabled = false; }
+  };
+  preview.append(generate, status, output); container.append(preview);
+  const audit = el('section', undefined, 'panel');
+  audit.append(el('h2', 'Actividad guardada'), el('p', 'Historial de roles y registros BIS, ascensos y versiones. BIS y ascensos muestran el último estado guardado de cada registro. Los logs de ejecución de Docker y las operaciones no persistidas no se incluyen. Fechas de SQLite en UTC.'));
+  const filters = el('form', undefined, 'audit-filters'), searchLabel = el('label', 'Buscar personaje, usuario o detalle');
+  const search = el('input'); search.type = 'search'; search.maxLength = 200; searchLabel.append(search);
+  const typeLabel = el('label', 'Tipo'), type = el('select');
+  for (const [value, text] of [['', 'Todos'], ['roles', 'Roles'], ['bis', 'Propuestas BIS'], ['ediciones-bis', 'Ediciones BIS'], ['ascensos', 'Ascensos'], ['versiones', 'Versiones']]) {
+    const option = el('option', text); option.value = value; type.append(option);
+  }
+  typeLabel.append(type);
+  const submit = el('button', 'Buscar / actualizar', 'secondary'); submit.type = 'submit';
+  filters.append(searchLabel, typeLabel, submit);
+  const results = el('div'), summary = el('p'); summary.setAttribute('role', 'status');
+  const pager = el('div', undefined, 'audit-pagination'), previous = el('button', '← Anterior', 'secondary'), next = el('button', 'Siguiente →', 'secondary');
+  let current = 1, loading = false;
+  async function load(requested = 1) {
+    if (loading) return;
+    loading = true; submit.disabled = previous.disabled = next.disabled = true;
+    summary.textContent = 'Cargando registros…';
+    try {
+      const params = new URLSearchParams({ project: 'wow', page: String(requested), search: search.value, type: type.value });
+      const response = await fetch(`/api/audit?${params}`), data = await response.json();
+      if (!response.ok) throw Error(data.error);
+      current = data.page;
+      results.replaceChildren(table('Registros', ['Fecha (UTC)', 'Tipo', 'Personaje', 'Usuario Discord', 'Detalle'], data.rows.map(r => [r.date, r.type, r.character, r.user, r.detail])));
+      summary.textContent = `${data.total} registros · Página ${current} de ${Math.max(1, Math.ceil(data.total / data.pageSize))}`;
+      previous.disabled = current <= 1; next.disabled = current * data.pageSize >= data.total;
+    } catch (error) { results.replaceChildren(); summary.textContent = error.message; }
+    finally { loading = false; submit.disabled = false; }
+  }
+  filters.onsubmit = event => { event.preventDefault(); load(1); };
+  previous.onclick = () => load(current - 1); next.onclick = () => load(current + 1);
+  pager.append(previous, next); audit.append(filters, summary, results, pager); container.append(audit); load();
+  container.append(el('h2', 'Estado actual guardado'));
+  renderState(container);
+}
 function render() {
   if (!config) return;
   const content = $('content'); content.replaceChildren();
@@ -93,8 +146,9 @@ function render() {
     summary.forEach(([label,value]) => { const box = el('div', undefined, 'stat'); box.append(el('small', label), el('strong', value, label === 'Vínculos guardados' ? '' : 'identifier')); stats.append(box); }); content.append(stats);
     const heading = el('div', undefined, 'section-heading'); heading.append(el('h2', 'Módulos de la solución'), el('span', `${config.modules.length} módulos`)); content.append(heading);
     const grid = el('div', undefined, 'grid');
-    config.modules.forEach((m,i) => { const card = el('article', undefined, 'card'), top = el('div', undefined, 'card-top'), status = readiness(m.id); top.append(el('span', ['◈','⇄','◎','▤','♧','✧'][i], 'icon'), el('span', status, `badge ${status.includes('guardad') || status === 'ID configurado' ? 'ready' : ''}`)); const button = el('button', m.fields.length ? 'Configurar módulo →' : 'Ver módulo →'); button.onclick = () => navigate(m.id); card.append(top, el('h3',m.name), el('p',m.description), button); grid.append(card); }); content.append(grid); renderState(content);
+    config.modules.forEach((m,i) => { const card = el('article', undefined, 'card'), top = el('div', undefined, 'card-top'), status = readiness(m.id); top.append(el('span', ['◈','⇄','◎','▤','♧','✧'][i % 6], 'icon'), el('span', status, `badge ${status.includes('guardad') || status === 'ID configurado' ? 'ready' : ''}`)); const button = el('button', m.fields.length ? 'Configurar módulo →' : 'Ver módulo →'); button.onclick = () => navigate(m.id); card.append(top, el('h3',m.name), el('p',m.description), button); grid.append(card); }); content.append(grid); renderState(content);
   } else {
+    if (page === 'daily-report') renderRecords(content);
     if (module.fields.length) {
       const form = el('section', undefined, 'panel'), grid = el('div', undefined, 'form-grid');
       module.fields.forEach(f => {
