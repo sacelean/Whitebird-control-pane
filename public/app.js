@@ -149,6 +149,7 @@ function render() {
     config.modules.forEach((m,i) => { const card = el('article', undefined, 'card'), top = el('div', undefined, 'card-top'), status = readiness(m.id); top.append(el('span', ['◈','⇄','◎','▤','♧','✧'][i % 6], 'icon'), el('span', status, `badge ${status.includes('guardad') || status === 'ID configurado' ? 'ready' : ''}`)); const button = el('button', m.fields.length ? 'Configurar módulo →' : 'Ver módulo →'); button.onclick = () => navigate(m.id); card.append(top, el('h3',m.name), el('p',m.description), button); grid.append(card); }); content.append(grid); renderState(content);
   } else {
     if (page === 'daily-report') renderRecords(content);
+    if (page === 'cauldrons') content.append(el('p', 'Cambia las asignaciones desde Discord con /calderos-asignar; el bot actualizará el mensaje del reparto automáticamente. Usa /calderos-publicar para publicar o mover ese mensaje.', 'hint'));
     if (module.fields.length) {
       const form = el('section', undefined, 'panel'), grid = el('div', undefined, 'form-grid');
       module.fields.forEach(f => {
@@ -177,7 +178,7 @@ function render() {
   }
   dirty();
 }
-function navigate(next) { page = next; render(); window.scrollTo({ top: 0 }); }
+function navigate(next) { if (busy) return; page = next; render(); window.scrollTo({ top: 0 }); }
 async function load() {
   const response = await fetch(`/api/config?project=${selectedProject}`); const data = await response.json(); if (!response.ok) throw Error(data.error || 'Error al cargar.'); config = data;
   const nav = $('navigation'); nav.replaceChildren(); config.modules.forEach(m => { const b = el('button',m.name); b.dataset.page = m.id; b.onclick = () => navigate(m.id); nav.append(b); }); render();

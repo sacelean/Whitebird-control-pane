@@ -4,7 +4,7 @@ Proyecto independiente para administrar WoW Role Sync, Recruitment y Ruleta medi
 
 ## Organización independiente
 
-Este repositorio contiene el frontend y la API local de administración. Tiene sus propias dependencias, pruebas y configuración; no importa código de los bots. Las rutas relativas de SQLite se resuelven desde la carpeta del `.env` de cada bot.
+Este repositorio contiene el frontend y la API local de administración. Tiene sus propias dependencias, pruebas y configuración; la vista previa del informe reutiliza el módulo de sincronización de WoW Role Sync en un proceso aislado con adaptadores de solo consulta. Las rutas relativas de SQLite se resuelven desde la carpeta del `.env` de cada bot.
 
 Estructura predeterminada:
 
@@ -63,7 +63,7 @@ Si ejecutas Node directamente, reinicia su proceso. No ejecutes una segunda inst
 
 Discord, sincronización, roster y WoWAudit tienen formularios con las variables que el bot consume. Roster se desactiva vaciando su ID; WoWAudit se desactiva eliminando su API key (afecta tanto al informe como a los avisos). No existen interruptores independientes para todas las funciones actuales.
 
-Calderos muestra el reparto y panel guardados; usa `/calderos-asignar` y `/calderos-publicar` para cambiarlos. El destino de raiders se establece con `/informe-raiders`. BIS y ascensos muestran las instrucciones de gestión. Recruitment incluye sus propias credenciales, categorías, transcripciones, mensajes, cinco preguntas y conexión compartida con WoW Sync. Su SQLite muestra el panel de solicitudes publicado. No almacena un historial de applies en su esquema actual.
+Calderos muestra el reparto y panel guardados. Las asignaciones se cambian únicamente en Discord con `/calderos-asignar`, que actualiza el mensaje del reparto automáticamente. Usa `/calderos-publicar` para publicar o mover ese mensaje. El destino de raiders se establece con `/informe-raiders`. BIS y ascensos muestran las instrucciones de gestión. Recruitment incluye sus propias credenciales, categorías, transcripciones, mensajes, cinco preguntas y conexión compartida con WoW Sync. Su SQLite muestra el panel de solicitudes publicado. No almacena un historial de applies en su esquema actual.
 
 `WOW_ROLE_SYNC_DATA_DIR` es una carpeta del host usada por Docker Compose. `WOW_ROLE_SYNC_DATABASE_PATH` es una ruta del proceso para ejecución directa; Compose la sobrescribe con `/app/wow-role-sync-data/whitebird-wow-roles.sqlite`. Las rutas del contenedor pueden no existir en el host: el panel mostrará SQLite no disponible si `DATABASE_PATH` apunta a una ruta inaccesible.
 
