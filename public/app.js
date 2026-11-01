@@ -3,7 +3,7 @@ const pending = {};
 const $ = id => document.getElementById(id);
 const el = (tag, text, className) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (className) node.className = className; return node; };
 function message(text, error = false) { $('notice').textContent = text; $('notice').className = error ? 'error' : ''; }
-function dirty() { $('project').disabled = busy; $('reload').disabled = busy; const count = Object.keys(pending).length; $('changes').textContent = count ? `${count} ajuste${count === 1 ? '' : 's'} sin guardar` : 'Sin cambios pendientes'; $('save').disabled = !count || busy; $('discard').disabled = !count || busy; }
+function dirty() { document.querySelectorAll('#content input, #content textarea, #content label button').forEach(node => { node.disabled = busy; }); $('restart').disabled = busy || !config?.restartEnabled || Object.keys(pending).length > 0; $('restart').title = !config?.restartEnabled ? 'Activa PANEL_RESTART_ENABLED en el servidor' : Object.keys(pending).length ? 'Guarda los cambios antes de reiniciar' : 'Recrea únicamente el bot seleccionado'; $('project').disabled = busy; $('reload').disabled = busy; const count = Object.keys(pending).length; $('changes').textContent = count ? `${count} ajuste${count === 1 ? '' : 's'} sin guardar` : 'Sin cambios pendientes'; $('save').disabled = !count || busy; $('discard').disabled = !count || busy; }
 function readiness(id) {
   const v = config.values, s = config.secrets;
   if (config.project.id === 'roulette' && id !== 'discord') return 'Gestión en Discord';
@@ -80,7 +80,7 @@ function render() {
         if (f.type === 'secret') { const clear = el('button', 'Eliminar credencial guardada', 'secondary'); clear.type = 'button'; clear.onclick = e => { e.preventDefault(); pending[f.key] = ''; input.value = ''; input.placeholder = 'Se eliminará al guardar'; dirty(); }; label.append(clear); }
         grid.append(label);
       }); form.append(grid); content.append(form);
-      content.append(el('p', `Los secretos vacíos se conservan salvo que pulses «Eliminar credencial guardada». Recrea el bot desde su propio proyecto: docker compose up -d --force-recreate ${config.project.id === 'roulette' ? 'whitebird-wow-wheel' : 'bot'}.`, 'hint warning'));
+      content.append(el('p', `Los secretos vacíos se conservan salvo que pulses «Eliminar credencial guardada». Guarda los cambios y pulsa «Aplicar guardado y reiniciar», o ejecuta desde el proyecto: docker compose up -d --force-recreate ${config.project.id === 'roulette' ? 'whitebird-wow-wheel' : 'bot'}.`, 'hint warning'));
     }
     if (page === 'audit') content.append(el('p', 'Informe: miércoles a las 20:00. Avisos de equipo: cada día a las 22:00. Ambos usan Europe/Madrid, fijado en el bot. Configura el destino con /informe-raiders.', 'hint'));
     if (page === 'bis') content.append(el('p', 'Las propuestas BIS y los ascensos se gestionan desde el bot. Esta primera versión del panel no edita listas ni mensajes de Discord.', 'hint'));
@@ -95,6 +95,20 @@ async function load() {
 }
 $('reload').onclick = async () => { if (Object.keys(pending).length && !confirm('¿Descartar los cambios y volver a leer el servidor?')) return; try { await load(); Object.keys(pending).forEach(k => delete pending[k]); render(); message('Configuración y SQLite actualizados.'); } catch(e) { message(e.message,true); } };
 $('discard').onclick = () => { Object.keys(pending).forEach(k => delete pending[k]); render(); message('Cambios descartados.'); };
+$('restart').onclick = async () => {
+  if (busy || !config?.restartEnabled || Object.keys(pending).length) return;
+  if (!confirm(`¿Recrear ${config.project.name} con su configuración guardada? El bot se desconectará brevemente.`)) return;
+  busy = true; dirty(); message(`Recreando ${config.project.name}…`);
+  try {
+    const response = await fetch(`/api/restart?project=${selectedProject}`, {
+      method: 'POST', headers: { 'X-Panel-CSRF': config.csrf, 'X-Panel-Revision': config.revision }
+    });
+    const data = await response.json();
+    if (!response.ok) throw Error(data.error);
+    message(data.message);
+  } catch (e) { message(e.message, true); }
+  finally { busy = false; dirty(); }
+};
 $('save').onclick = async () => {
   busy = true; dirty();
   try { const response = await fetch(`/api/config?project=${selectedProject}`, { method:'PUT', headers:{ 'Content-Type':'application/json', 'X-Panel-CSRF':config.csrf }, body:JSON.stringify({ revision: config.revision, changes: pending }) }); const data = await response.json(); if (!response.ok) throw Error(data.error); Object.keys(pending).forEach(k => delete pending[k]); await load(); message(data.message); }

@@ -1,5 +1,8 @@
 import 'dotenv/config';
 import http from 'node:http';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+const runCompose = promisify(execFile);
 import { readFile, writeFile, rename, unlink, access } from 'node:fs/promises';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +12,7 @@ import { view, update, revision, modules, recruitmentModules, rouletteModules } 
 
 const here = dirname(fileURLToPath(import.meta.url));
 const botsRoot = resolve(here, '..');
-export function createPanel({ envPath = resolve(process.env.PANEL_ENV_PATH || join(botsRoot, 'whitebird-wow-role-sync/.env')), port = Number(process.env.PANEL_PORT || 3080), recruitmentEnvPath = resolve(process.env.PANEL_RECRUITMENT_ENV_PATH || join(botsRoot, 'whitebird-recruitment-bot/.env')), rouletteEnvPath = resolve(process.env.PANEL_ROULETTE_ENV_PATH || join(botsRoot, 'whitebird-wow-wheel/.env')) } = {}) {
+export function createPanel({ restartEnabled = process.env.PANEL_RESTART_ENABLED === 'true', execute = runCompose, envPath = resolve(process.env.PANEL_ENV_PATH || join(botsRoot, 'whitebird-wow-role-sync/.env')), port = Number(process.env.PANEL_PORT || 3080), recruitmentEnvPath = resolve(process.env.PANEL_RECRUITMENT_ENV_PATH || join(botsRoot, 'whitebird-recruitment-bot/.env')), rouletteEnvPath = resolve(process.env.PANEL_ROULETTE_ENV_PATH || join(botsRoot, 'whitebird-wow-wheel/.env')) } = {}) {
 const origin = `http://127.0.0.1:${port}`;
 const csrf = randomBytes(32).toString('hex');
 let saving = false;
@@ -51,14 +54,38 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, list);
     }
     const project = projects.find(p => p.id === (url.searchParams.get('project') || 'wow'));
+    if (url.pathname === '/api/restart' && req.method === 'POST') {
+      if (req.headers['x-panel-csrf'] !== csrf) return send(res, 403, { error: 'Recarga el panel para reiniciar.' });
+      if (!project) return send(res, 404, { error: 'Bot desconocido.' });
+      if (!restartEnabled) return send(res, 403, { error: 'Reinicio deshabilitado. Configura PANEL_RESTART_ENABLED=true en el servidor.' });
+      if (saving) return send(res, 409, { error: 'Hay otro guardado o reinicio en curso.' });
+      saving = true;
+      try {
+        const current = await readEnv(project);
+        if (req.headers['x-panel-revision'] !== revision(current)) return send(res, 409, { error: 'La configuración ha cambiado. Recarga antes de reiniciar.' });
+        const service = project.id === 'roulette' ? 'whitebird-wow-wheel' : 'bot';
+        try {
+          await execute('docker', ['compose', 'up', '-d', '--no-deps', '--force-recreate', service], {
+            cwd: project.base, timeout: 120000, maxBuffer: 1024 * 1024,
+            // La configuración de Compose debe venir del .env del bot, no del panel.
+            env: Object.fromEntries(Object.entries(process.env).filter(([key]) =>
+              ['PATH', 'HOME', 'USER', 'LOGNAME', 'LANG', 'DOCKER_HOST', 'DOCKER_CONTEXT', 'DOCKER_CONFIG', 'DOCKER_TLS_VERIFY', 'DOCKER_CERT_PATH', 'XDG_RUNTIME_DIR'].includes(key)))
+          });
+        } catch (error) {
+          const timeout = error.killed ? ' Se agotó el tiempo; comprueba el contenedor antes de repetir.' : '';
+          return send(res, 502, { error: `No se pudo confirmar la recreación del bot. Comprueba Docker Compose y los permisos del usuario del panel.${timeout} La configuración sigue guardada.` });
+        }
+        return send(res, 200, { ok: true, message: `${project.name}: contenedor recreado con la configuración guardada. Esto no confirma la conexión a Discord.` });
+      } finally { saving = false; }
+    }
     if (url.pathname === '/api/config' && (!project || !project.path)) return send(res, 404, { error: 'Bot no integrado o desconocido.' });
     if (url.pathname === '/api/config' && req.method === 'GET') {
       const text = await readEnv(project);
-      return send(res, 200, { ...view(text, project.modules), project: { id: project.id, name: project.name }, csrf, state: await state(parse(text), project), runtime: 'Configuración guardada en disco. El panel no verifica el proceso ni la conexión en vivo con Discord.' });
+      return send(res, 200, { ...view(text, project.modules), project: { id: project.id, name: project.name }, restartEnabled, csrf, state: await state(parse(text), project), runtime: 'Configuración guardada en disco. El panel no verifica el proceso ni la conexión en vivo con Discord.' });
     }
     if (url.pathname === '/api/config' && req.method === 'PUT') {
       if (req.headers['x-panel-csrf'] !== csrf) return send(res, 403, { error: 'Recarga el panel para guardar.' });
-      if (saving) return send(res, 409, { error: 'Hay otro guardado en curso.' });
+      if (saving) return send(res, 409, { error: 'Hay otro guardado o reinicio en curso.' });
       saving = true;
       try {
         let body = '';
