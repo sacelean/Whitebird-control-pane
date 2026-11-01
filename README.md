@@ -1,6 +1,6 @@
 # Whitebird · Centro de control
 
-Proyecto independiente para administrar WoW Role Sync, Recruitment y Ruleta mediante un selector de bots, con archivos de configuración separados. No arranca el bot ni envía mensajes a Discord.
+Proyecto independiente para administrar WoW Role Sync, Recruitment y Ruleta mediante un selector de bots, con archivos de configuración separados. Permite recrear los bots con Docker Compose cuando se habilita esa opción.
 
 ## Organización independiente
 
@@ -51,7 +51,7 @@ Ejecuta el panel en el host que contiene el `.env` del bot y su carpeta `data/`,
 - Rechaza guardados con revisión obsoleta y serializa las escrituras del propio panel. Evita editar el `.env` simultáneamente con herramientas externas durante un guardado.
 - Guarda con reemplazo atómico y permisos 0600. No modifica SQLite ni aplica migraciones.
 
-**Guardar no aplica la configuración al proceso en ejecución.** En la raíz del bot ejecuta:
+**Guardar no aplica la configuración al proceso en ejecución.** Tras guardar, pulsa **Aplicar guardado y reiniciar** y confirma para recrear solo el bot seleccionado. Requiere `PANEL_RESTART_ENABLED=true` y acceso a Docker Compose del usuario del panel. Alternativamente, en la raíz del bot ejecuta:
 
 ```sh
 docker compose up -d --force-recreate bot
@@ -101,3 +101,28 @@ La pipeline de [GitHub Actions](.github/workflows/ci-cd.yml) verifica las PR y
 los cambios en `main`, y despliega por SSH tras superar las pruebas.
 La [guía de despliegue](deploy/README.md) explica la preparación de la máquina,
 los secrets de GitHub, el servicio systemd y la recuperación automática.
+
+### Reinicio desde el panel
+
+`PANEL_RESTART_ENABLED=true` habilita el botón; sin esta variable queda
+deshabilitado. En OCI añádela a `/etc/whitebird-control-panel.env` y reinicia
+`whitebird-control-panel`. Los despliegues no reemplazan ese archivo.
+
+La carpeta del proyecto se toma del directorio del `.env` configurado para
+cada bot. Debe contener su Compose. Los servicios son `bot` para WoW Sync y
+Recruitment, y `whitebird-wow-wheel` para Ruleta. No se admiten comandos desde
+el navegador. Se ejecuta `docker compose up -d --no-deps --force-recreate`
+solo sobre ese servicio, con un límite de dos minutos.
+
+En la instalación OCI con los bots propiedad de `ubuntu`, el servicio del
+panel debe ejecutarse también como `ubuntu` (User y Group en systemd), con
+acceso al directorio del proyecto y Docker. Comprueba como ese usuario
+`docker compose version` y `docker ps`. El acceso a Docker da control amplio
+sobre el host; mantén el panel limitado a loopback y acceso por SSH.
+
+El botón requiere guardar primero y pide confirmación. Durante una operación
+no se permite otro guardado o reinicio. Un resultado correcto confirma la
+recreación, no la conexión a Discord. Si falla o expira el tiempo, los cambios
+siguen guardados y debes consultar `docker compose ps` y los logs del bot
+antes de repetir. El panel no devuelve la salida de Compose para evitar
+exponer credenciales.

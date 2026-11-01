@@ -86,3 +86,66 @@ test('resuelve SQLite desde el bot aunque el panel esté en otro repositorio', a
     await rm(dir, { recursive:true, force:true });
   }
 });
+
+test('reinicio: CSRF, revisión, servicios fijos, exclusión y errores sin filtrar secretos', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'whitebird-restart-'));
+  const envPath = join(dir, '.env');
+  await writeFile(envPath, 'DISCORD_TOKEN=private-token\n');
+  const calls = [];
+  let finish;
+  const server = createPanel({ port: 19389, envPath, recruitmentEnvPath: envPath, rouletteEnvPath: envPath,
+    restartEnabled: true, execute: (...args) => { calls.push(args); return new Promise(resolve => { finish = resolve; }); } });
+  try {
+    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(19389, '127.0.0.1', resolve); });
+    const base = 'http://127.0.0.1:19389';
+    const config = await (await fetch(`${base}/api/config`)).json();
+    const headers = { 'X-Panel-CSRF': config.csrf, 'X-Panel-Revision': config.revision };
+    const post = (project, h = headers) => fetch(`${base}/api/restart?project=${project}`, { method: 'POST', headers: h });
+    assert.equal((await post('wow', {})).status, 403);
+    assert.equal((await post('wow', { ...headers, 'X-Panel-Revision': 'stale' })).status, 409);
+    assert.equal((await post('../other')).status, 404);
+    assert.equal(calls.length, 0);
+    for (const [project, service] of [['wow','bot'], ['recruitment','bot'], ['roulette','whitebird-wow-wheel']]) {
+      const running = post(project);
+      while (!finish) await new Promise(resolve => setTimeout(resolve, 5));
+      assert.equal((await post(project)).status, 409);
+      const save = await fetch(`${base}/api/config`, { method: 'PUT', headers, body: '{}' });
+      assert.equal(save.status, 409);
+      const [command, args, options] = calls.at(-1);
+      assert.equal(command, 'docker');
+      assert.deepEqual(args, ['compose','up','-d','--no-deps','--force-recreate',service]);
+      assert.equal(options.cwd, dir);
+      assert.equal(options.timeout, 120000);
+      finish(); finish = undefined;
+      assert.equal((await running).status, 200);
+    }
+  } finally {
+    finish?.();
+    await new Promise(resolve => server.close(resolve));
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('reinicio deshabilitado y fallo Docker no devuelven salida con secretos', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'whitebird-restart-error-'));
+  const envPath = join(dir, '.env');
+  await writeFile(envPath, 'DISCORD_TOKEN=private-token\n');
+  try {
+    for (const enabled of [false, true]) {
+      let calls = 0;
+      const port = enabled ? 19391 : 19390;
+      const server = createPanel({ port, envPath, restartEnabled: enabled, execute: async () => { calls++; throw Error('private-token'); } });
+      try {
+        await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
+        const base = `http://127.0.0.1:${port}`;
+        const config = await (await fetch(`${base}/api/config`)).json();
+        for (let i = 0; i < 2; i++) {
+          const result = await fetch(`${base}/api/restart?project=wow`, { method: 'POST', headers: { 'X-Panel-CSRF': config.csrf, 'X-Panel-Revision': config.revision } });
+          assert.equal(result.status, enabled ? 502 : 403);
+          assert.ok(!(await result.text()).includes('private-token'));
+        }
+        assert.equal(calls, enabled ? 2 : 0);
+      } finally { await new Promise(resolve => server.close(resolve)); }
+    }
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
