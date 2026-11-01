@@ -1,0 +1,34 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { parse } from 'dotenv';
+import { update, view } from '../config.js';
+test('no devuelve credenciales y distingue su presencia', () => {
+  const data = view('DISCORD_TOKEN=super-secret\nBLIZZARD_CLIENT_SECRET=hidden');
+  assert.equal(data.secrets.DISCORD_TOKEN, true);
+  assert.equal(data.values.DISCORD_TOKEN, undefined);
+  assert.ok(!JSON.stringify(data).includes('super-secret'));
+});
+test('conserva comentarios, variables ajenas y secretos no modificados', () => {
+  const text = '# configuración\nDISCORD_TOKEN=secret\nOTHER=value\nWOW_SYNC_HOUR=4\n';
+  const result = update(text, { WOW_SYNC_HOUR: '6' });
+  assert.equal(parse(result).DISCORD_TOKEN, 'secret');
+  assert.equal(parse(result).WOW_SYNC_HOUR, '6');
+  assert.ok(result.includes('# configuración\n'));
+  assert.equal(parse(result).OTHER, 'value');
+});
+test('serializa JSON y símbolos sin alterar su valor', () => {
+  const value = '{"Alchemy":"123456789012345678"}';
+  assert.equal(parse(update('', { WOW_PROFESSION_ROLE_IDS: value })).WOW_PROFESSION_ROLE_IDS, value);
+  assert.equal(parse(update('', { DISCORD_TOKEN: 'abc#xyz$hello' })).DISCORD_TOKEN, 'abc#xyz$hello');
+});
+test('conserva secuencias de escape literales en secretos', () => {
+  const value = String.raw`token\npart`;
+  assert.equal(parse(update('', { DISCORD_TOKEN: value })).DISCORD_TOKEN, value);
+});
+test('rechaza inyección, claves no admitidas y valores inválidos', () => {
+  for (const changes of [{ DISCORD_TOKEN: 'a\nEVIL=1' }, { DATABASE_PATH: '/tmp/other' }, { WOW_SYNC_HOUR: '24' }, { WOW_SYNC_TIMEZONE: 'invalid/zone' }, { WOW_RANK_ROLE_IDS: '[]' }, { WOW_ROSTER_ROLE_ID: 'bad' }, { WOWAUDIT_LOOT_WINDOW_DAYS: '3661' }]) assert.throws(() => update('', changes));
+});
+test('rechaza IDs de roles compartidos y permite borrar un secreto explícitamente', () => {
+  assert.throws(() => update('WOW_DEFAULT_RANK_ROLE_ID=123456789012345678', { WOW_ROSTER_ROLE_ID:'123456789012345678' }));
+  assert.equal(parse(update('DISCORD_TOKEN=old', { DISCORD_TOKEN:'' })).DISCORD_TOKEN, '');
+});

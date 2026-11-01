@@ -1,0 +1,9 @@
+{
+  "name": "whitebird-control-panel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node server.js", "test": "node --test test/*.test.js" },
+  "engines": { "node": ">=22" },
+  "dependencies": { "dotenv": "^16.6.1", "better-sqlite3": "^13.0.3" }
+}
