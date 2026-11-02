@@ -59,6 +59,8 @@ docker compose up -d --force-recreate bot
 
 Si ejecutas Node directamente, reinicia su proceso. No ejecutes una segunda instancia del bot. El panel muestra datos guardados, no disponibilidad en vivo de Discord ni confirmación de configuración aplicada. Los valores por defecto del formulario no implican que la integración esté operativa.
 
+Cada campo dispone de un icono de información con una explicación de su uso. La ayuda se abre al pasar el ratón, enfocar el icono con el teclado o tocarlo; Escape la cierra. Cada bot tiene un apartado **Comandos de Discord** con la descripción, sintaxis, parámetros y permisos de sus comandos.
+
 ## Alcance de los módulos
 
 Discord, sincronización, roster y WoWAudit tienen formularios con las variables que el bot consume. Roster se desactiva vaciando su ID; WoWAudit se desactiva eliminando su API key (afecta tanto al informe como a los avisos). No existen interruptores independientes para todas las funciones actuales.

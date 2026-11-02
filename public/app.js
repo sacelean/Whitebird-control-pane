@@ -1,9 +1,64 @@
+import { fieldHelp, botCommands } from './help.js';
 let config, page = 'overview', busy = false, selectedProject = 'wow';
 const pending = {};
 const $ = id => document.getElementById(id);
 const el = (tag, text, className) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (className) node.className = className; return node; };
+let helpTrigger, helpCloseTimer;
+const tooltip = el('div', undefined, 'info-tooltip');
+tooltip.id = 'field-tooltip'; tooltip.setAttribute('role', 'tooltip'); tooltip.hidden = true;
+document.body.append(tooltip);
+function closeHelp() {
+  clearTimeout(helpCloseTimer);
+  helpTrigger?.removeAttribute('aria-describedby');
+  helpTrigger = undefined; tooltip.hidden = true;
+}
+function showHelp(button, text) {
+  closeHelp(); helpTrigger = button;
+  tooltip.textContent = text; tooltip.hidden = false;
+  button.setAttribute('aria-describedby', tooltip.id);
+  const rect = button.getBoundingClientRect(), bounds = tooltip.getBoundingClientRect();
+  tooltip.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - bounds.width - 12))}px`;
+  tooltip.style.top = `${Math.max(12, rect.bottom + bounds.height + 12 < window.innerHeight ? rect.bottom + 8 : rect.top - bounds.height - 8)}px`;
+}
+function deferCloseHelp() {
+  clearTimeout(helpCloseTimer);
+  helpCloseTimer = setTimeout(closeHelp, 180);
+}
+function infoButton(caption, text) {
+  const button = el('button', 'i', 'info-button'); button.type = 'button';
+  button.setAttribute('aria-label', `Información sobre ${caption}`);
+  button.onmouseenter = () => showHelp(button, text);
+  button.onmouseleave = event => { if (!tooltip.contains(event.relatedTarget) && document.activeElement !== button) deferCloseHelp(); };
+  button.onfocus = () => showHelp(button, text);
+  button.onblur = closeHelp;
+  button.onclick = () => showHelp(button, text);
+  return button;
+}
+tooltip.onmouseenter = () => clearTimeout(helpCloseTimer);
+tooltip.onmouseleave = event => { if (event.relatedTarget !== helpTrigger && document.activeElement !== helpTrigger) closeHelp(); };
+document.addEventListener('keydown', event => { if (event.key === 'Escape') closeHelp(); });
+document.addEventListener('pointerdown', event => { if (event.target !== helpTrigger && !tooltip.contains(event.target)) closeHelp(); });
+window.addEventListener('resize', closeHelp);
+window.addEventListener('scroll', closeHelp, true);
+function fieldCaption(caption, id, description) {
+  const row = el('div', undefined, 'field-caption');
+  const label = el('label', caption); label.htmlFor = id;
+  row.append(label, infoButton(caption, description)); return row;
+}
+function renderCommands(container) {
+  container.append(el('p', 'Consulta los comandos que debes escribir en Discord con el bot seleccionado. < > indica un parámetro obligatorio; [ ] indica uno opcional. No escribas los corchetes.', 'hint'));
+  container.append(el('p', 'Los oficiales son miembros con el permiso Gestionar servidor o alguno de los roles configurados en OFFICER_ROLE_IDS.'));
+  const list = el('div', undefined, 'command-list');
+  for (const command of botCommands[config.project.id] || []) {
+    const card = el('article', undefined, 'panel command-card');
+    const heading = el('h2'); heading.append(el('code', `/${command.name}`));
+    card.append(heading, el('span', command.access, 'badge'), el('p', command.description), el('code', command.usage, 'command-usage'));
+    list.append(card);
+  }
+  container.append(list);
+}
 function message(text, error = false) { $('notice').textContent = text; $('notice').className = error ? 'error' : ''; }
-function dirty() { document.querySelectorAll('#content input, #content textarea, #content label button, #content .editor-toolbar select').forEach(node => { node.disabled = busy; }); $('restart').disabled = busy || !config?.restartEnabled || Object.keys(pending).length > 0; $('restart').title = !config?.restartEnabled ? 'Activa PANEL_RESTART_ENABLED en el servidor' : Object.keys(pending).length ? 'Guarda los cambios antes de reiniciar' : 'Recrea únicamente el bot seleccionado'; $('project').disabled = busy; $('reload').disabled = busy; const count = Object.keys(pending).length; $('changes').textContent = count ? `${count} ajuste${count === 1 ? '' : 's'} sin guardar` : 'Sin cambios pendientes'; $('save').disabled = !count || busy; $('discard').disabled = !count || busy; }
+function dirty() { document.querySelectorAll('#content input, #content textarea, #content .config-field button:not(.info-button), #content .editor-toolbar select').forEach(node => { node.disabled = busy; }); $('restart').disabled = busy || !config?.restartEnabled || Object.keys(pending).length > 0; $('restart').title = !config?.restartEnabled ? 'Activa PANEL_RESTART_ENABLED en el servidor' : Object.keys(pending).length ? 'Guarda los cambios antes de reiniciar' : 'Recrea únicamente el bot seleccionado'; $('project').disabled = busy; $('reload').disabled = busy; const count = Object.keys(pending).length; $('changes').textContent = count ? `${count} ajuste${count === 1 ? '' : 's'} sin guardar` : 'Sin cambios pendientes'; $('save').disabled = !count || busy; $('discard').disabled = !count || busy; }
 function readiness(id) {
   const v = config.values, s = config.secrets;
   if (config.project.id === 'roulette' && id !== 'discord') return 'Gestión en Discord';
@@ -94,9 +149,10 @@ function renderRecords(container) {
   preview.append(generate, status, output); container.append(preview);
   const audit = el('section', undefined, 'panel');
   audit.append(el('h2', 'Actividad guardada'), el('p', 'Historial de roles y registros BIS, ascensos y versiones. BIS y ascensos muestran el último estado guardado de cada registro. Los logs de ejecución de Docker y las operaciones no persistidas no se incluyen. Fechas de SQLite en UTC.'));
-  const filters = el('form', undefined, 'audit-filters'), searchLabel = el('label', 'Buscar personaje, usuario o detalle');
-  const search = el('input'); search.type = 'search'; search.maxLength = 200; searchLabel.append(search);
-  const typeLabel = el('label', 'Tipo'), type = el('select');
+  const filters = el('form', undefined, 'audit-filters'), searchLabel = el('div', undefined, 'audit-filter');
+  const search = el('input'); search.type = 'search'; search.maxLength = 200; search.id = 'audit-search'; searchLabel.append(fieldCaption('Buscar personaje, usuario o detalle', search.id, 'Filtra la actividad guardada por personaje, usuario de Discord o texto del detalle. Pulsa Buscar / actualizar para aplicar el filtro.'), search);
+  const typeLabel = el('div', undefined, 'audit-filter'), type = el('select');
+  type.id = 'audit-type'; typeLabel.append(fieldCaption('Tipo', type.id, 'Limita la actividad a roles, propuestas BIS, ediciones BIS, ascensos o versiones. Todos incluye cualquier tipo; pulsa Buscar / actualizar para aplicar.'));
   for (const [value, text] of [['', 'Todos'], ['roles', 'Roles'], ['bis', 'Propuestas BIS'], ['ediciones-bis', 'Ediciones BIS'], ['ascensos', 'Ascensos'], ['versiones', 'Versiones']]) {
     const option = el('option', text); option.value = value; type.append(option);
   }
@@ -129,13 +185,15 @@ function renderRecords(container) {
 }
 function render() {
   if (!config) return;
+  closeHelp();
   const content = $('content'); content.replaceChildren();
   document.querySelectorAll('[data-page]').forEach(b => b.classList.toggle('active', b.dataset.page === page));
-  const module = config.modules.find(m => m.id === page);
+  const module = page === 'commands' ? { name: 'Comandos de Discord', description: `Guía de uso de los comandos de ${config.project.name}.`, fields: [] } : config.modules.find(m => m.id === page);
   $('breadcrumb').textContent = `${config.project.name} / ${module?.name || 'Vista general'}`;
   $('title').textContent = module?.name || 'Tu servidor, en un solo lugar.';
   $('subtitle').textContent = module?.description || 'Consulta la configuración y organiza las funciones de la hermandad por módulos.';
   content.append(el('p', config.runtime, 'hint'));
+  if (page === 'commands') { renderCommands(content); dirty(); return; }
   if (!module) {
     const stats = el('div', undefined, 'stats');
     const summary = config.project.id === 'roulette'
@@ -153,8 +211,9 @@ function render() {
     if (module.fields.length) {
       const form = el('section', undefined, 'panel'), grid = el('div', undefined, 'form-grid');
       module.fields.forEach(f => {
-        const label = el('label', f.label), input = el(['json','ranks','message'].includes(f.type) ? 'textarea' : 'input');
+        const label = el('div', undefined, 'config-field'), input = el(['json','ranks','message'].includes(f.type) ? 'textarea' : 'input');
         if (input.tagName === 'INPUT') input.type = f.type === 'secret' ? 'password' : 'text';
+        label.append(fieldCaption(f.label, f.key, fieldHelp[f.key]));
         input.id = f.key; input.name = f.key; input.autocomplete = 'off'; input.spellcheck = false;
         input.value = pending[f.key] ?? config.values[f.key] ?? '';
         if (f.type === 'secret') input.placeholder = config.secrets[f.key] ? 'Guardado · escribe para sustituir' : 'Sin configurar';
@@ -181,8 +240,11 @@ function render() {
 function navigate(next) { if (busy) return; page = next; render(); window.scrollTo({ top: 0 }); }
 async function load() {
   const response = await fetch(`/api/config?project=${selectedProject}`); const data = await response.json(); if (!response.ok) throw Error(data.error || 'Error al cargar.'); config = data;
-  const nav = $('navigation'); nav.replaceChildren(); config.modules.forEach(m => { const b = el('button',m.name); b.dataset.page = m.id; b.onclick = () => navigate(m.id); nav.append(b); }); render();
+  const nav = $('navigation'); nav.replaceChildren(); [...config.modules, { id: 'commands', name: 'Comandos de Discord' }].forEach(m => { const b = el('button',m.name); b.dataset.page = m.id; b.onclick = () => navigate(m.id); nav.append(b); }); render();
 }
+const projectCaption = fieldCaption('BOT / ADDON', 'project', 'Selecciona el bot cuya configuración, registros y comandos quieres consultar. Cada bot tiene su propio archivo de configuración.');
+projectCaption.classList.add('project-label');
+document.querySelector('.project-label').replaceWith(projectCaption);
 $('reload').onclick = async () => { if (Object.keys(pending).length && !confirm('¿Descartar los cambios y volver a leer el servidor?')) return; try { await load(); Object.keys(pending).forEach(k => delete pending[k]); render(); message('Configuración y SQLite actualizados.'); } catch(e) { message(e.message,true); } };
 $('discard').onclick = () => { Object.keys(pending).forEach(k => delete pending[k]); render(); message('Cambios descartados.'); };
 $('restart').onclick = async () => {

@@ -110,3 +110,21 @@ code { color: #a3d6ff; overflow-wrap: anywhere; }
 .audit-filters label:first-child { flex: 1; min-width: 180px; }
 .audit-filters select { display: block; padding: 12px; margin-top: 10px; background: #091323; border: 1px solid #354966; border-radius: 4px; color: #eef2fa; }
 .audit-pagination { display: flex; gap: 12px; }
+
+.config-field { min-width: 0; font-size: 12px; color: #d2dceb; }
+.config-field small { display: block; color: #8b9eb9; margin-top: 7px; font-size: 10px; overflow-wrap: anywhere; }
+.field-caption { display: flex; gap: 8px; align-items: center; }
+.field-caption label { min-width: 0; }
+button.info-button { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 19px; height: 19px; padding: 0; border: 1px solid #8babc9; border-radius: 50%; color: #c0ddf5; background: #142138; font: 600 12px Georgia, serif; cursor: help; vertical-align: middle; }
+button.info-button:hover, button.info-button:focus-visible { color: #ffe4aa; border-color: #dfbf78; background: #29415c; }
+.project-label .info-button { margin-left: 8px; letter-spacing: normal; }
+.info-tooltip { position: fixed; z-index: 10; width: max-content; max-width: min(350px, calc(100vw - 24px)); padding: 13px 16px; border: 1px solid #6586a6; border-radius: 6px; background: #101d30; color: #e1e8f5; box-shadow: 0 8px 28px #0008; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.info-tooltip[hidden] { display: none; }
+.command-list { display: grid; gap: 16px; margin-top: 24px; }
+.command-card { margin: 0; }
+.command-card h2 { margin-bottom: 10px; font-size: 17px; }
+.command-card p { margin: 14px 0; }
+.command-usage { display: block; padding: 12px; background: #091323; border: 1px solid #354966; border-radius: 4px; white-space: pre-wrap; font-size: 12px; line-height: 1.7; }
+.audit-filters .audit-filter:first-child { flex: 1; min-width: 180px; }
+
+.project-label label { color: inherit; font-size: inherit; letter-spacing: inherit; }
