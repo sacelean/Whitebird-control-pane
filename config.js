@@ -30,6 +30,17 @@ export function view(text, selectedModules = modules) {
   const env = parse(text);
   return { modules: selectedModules, revision: revision(text), values: Object.fromEntries(fields.filter(f => f.type !== 'secret').map(f => [f.key, env[f.key] ?? f.fallback])), secrets: Object.fromEntries(fields.filter(f => f.type === 'secret').map(f => [f.key, Boolean(env[f.key])])) };
 }
+// Use syntax shared by dotenv and Compose env_file. Backticks are not quotes in Compose.
+function envLine(key, value) {
+  let encoded;
+  if (/^[A-Za-z0-9_./,:@%+=-]*$/.test(value)) encoded = value;
+  else if (!value.includes("'") && !value.endsWith("\\")) encoded = `'${value}'`;
+  else if (!/["$\\]/.test(value)) encoded = `"${value}"`;
+  else throw Error(`${key}: el valor no puede representarse sin alterarlo en dotenv y Docker Compose.`);
+  const line = `${key}=${encoded}`;
+  if (parse(line)[key] !== value) throw Error(`${key}: el valor no puede representarse sin alterarlo en dotenv y Docker Compose.`);
+  return line;
+}
 export function update(text, changes, selectedModules = modules) {
   const fields = selectedModules.flatMap(m => m.fields);
   if (!changes || typeof changes !== 'object' || Array.isArray(changes)) throw Error('Cambios no válidos.');
@@ -55,12 +66,17 @@ export function update(text, changes, selectedModules = modules) {
     try { ids = [...Object.values(JSON.parse(env.WOW_RANK_ROLE_IDS || '{}')), ...Object.values(JSON.parse(env.WOW_PROFESSION_ROLE_IDS || '{}')), env.WOW_DEFAULT_RANK_ROLE_ID || '1463652921898963147', env.WOW_ROSTER_ROLE_ID].filter(Boolean); } catch { throw Error('Corrige los mapas JSON de roles antes de guardar.'); }
     if (new Set(ids).size !== ids.length) throw Error('Los roles de rango, profesión, Viajante y roster deben ser distintos.');
   }
+  // Repair legacy backtick quoting on managed fields, including unchanged secrets.
+  // Values come from dotenv; credentials and unrelated variables remain intact.
+  const writes = { ...changes };
+  for (const f of fields) {
+    if (Object.hasOwn(writes, f.key)) continue;
+    const legacy = new RegExp(`^(?:export[ \t]+)?${f.key}[ \t]*=[ \t]*\x60`, 'm');
+    if (legacy.test(text) && Object.hasOwn(env, f.key)) writes[f.key] = env[f.key];
+  }
   let result = text;
-  for (const [key, value] of Object.entries(changes)) {
-    const quote = ['`', "'", '"'].find(q => !value.includes(q));
-    if (!quote) throw Error(`${key}: combinación de comillas no admitida.`);
-    const line = `${key}=${quote}${value}${quote}`;
-    if (parse(line)[key] !== value) throw Error(`${key}: el valor no puede representarse sin alterarlo en dotenv.`);
+  for (const [key, value] of Object.entries(writes)) {
+    const line = envLine(key, value);
     const pattern = new RegExp(`^(?:export[ \t]+)?${key}[ \t]*=[ \t]*(?:"[^"]*"|'[^']*'|\x60[^\x60]*\x60|[^\r\n]*)[^\r\n]*$`, 'gm');
     if (pattern.test(result)) result = result.replace(pattern, () => line);
     else result += `${result.endsWith('\n') ? '' : '\n'}${line}\n`;

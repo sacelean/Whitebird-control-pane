@@ -39,7 +39,7 @@ Ejecuta el panel en el host que contiene el `.env` del bot y su carpeta `data/`,
 
 ## Configuración y estado
 
-- Lee y edita `../whitebird-wow-role-sync/.env`, conservando variables ajenas y comentarios de otras líneas. `PANEL_ENV_PATH` permite indicar otro archivo. Los valores guardados se entrecomillan; no se admiten saltos de línea.
+- Lee y edita `../whitebird-wow-role-sync/.env`, conservando variables ajenas y comentarios de otras líneas. `PANEL_ENV_PATH` permite indicar otro archivo. Los valores simples (IDs, horas, rutas) se guardan sin comillas. Los textos que lo necesitan usan comillas compatibles con dotenv y Docker Compose, nunca comillas invertidas. Los mensajes admiten saltos de línea. Al guardar se corrigen también las comillas invertidas antiguas de los campos gestionados del bot seleccionado.
 - `PANEL_PORT` cambia el puerto (3080 por defecto).
 - Recruitment se busca en `../whitebird-recruitment-bot/.env`, como proyecto hermano de este panel. `PANEL_RECRUITMENT_ENV_PATH` permite indicar su archivo. El panel no crea archivos ausentes ni modifica parámetros de un bot al guardar otro.
 - Ruleta se busca en `../whitebird-wow-wheel/.env`. `PANEL_ROULETTE_ENV_PATH` permite indicar otro archivo. Sin un archivo local aparece como no disponible; el panel no descarga credenciales desde GitHub. Su SQLite por defecto es `data/whitebird.sqlite`.

@@ -48,3 +48,15 @@ test('mensajes de recruitment: conserva saltos de línea y reemplaza el bloque c
   assert.equal(parse(cleared).APPLY_RECEIVED_MESSAGE, '');
   assert.equal(parse(cleared).OTHER, 'conservar');
 });
+
+test('guarda IDs y valores simples sin comillas y repara el formato antiguo', () => {
+  const original = '# Conservar\nWOW_ROSTER_ROLE_ID=`1566419007815417947`\nDISCORD_TOKEN=`abc#xyz$hello`\nOTHER=`ajeno`\n';
+  const saved = update(original, { WOW_SYNC_HOUR: '6' });
+  assert.ok(saved.includes('WOW_ROSTER_ROLE_ID=1566419007815417947\n'));
+  assert.ok(saved.includes('WOW_SYNC_HOUR=6\n'));
+  assert.equal(parse(saved).DISCORD_TOKEN, 'abc#xyz$hello');
+  assert.ok(saved.includes("DISCORD_TOKEN='abc#xyz$hello'"));
+  assert.ok(saved.includes('# Conservar\n'));
+  assert.ok(saved.includes('OTHER=`ajeno`'));
+  assert.equal(update(saved, {}), saved);
+});
