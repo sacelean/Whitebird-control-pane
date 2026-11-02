@@ -21,7 +21,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - name: Empaquetar aplicación
-        run: tar -czf panel.tar.gz package.json package-lock.json server.js config.js audit.js daily-report.js daily-report-worker.js public deploy
+        run: tar -czf panel.tar.gz package.json package-lock.json ./*.js public deploy
       - uses: actions/upload-artifact@v4
         with:
           name: panel

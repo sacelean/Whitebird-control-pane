@@ -11,6 +11,21 @@ cd "$root/incoming/$release"
 [[ $(node -p 'process.versions.node.split(".")[0]') == 22 ]] || { echo 'Se requiere Node.js 22' >&2; exit 1; }
 # Instala el módulo SQLite nativo en la arquitectura real de OCI (ARM o x86).
 npm ci --omit=dev
+# Verifica imports y el módulo nativo antes de cambiar la release activa.
+# Importar server.js no abre el puerto ni modifica las bases de datos de los bots.
+node --input-type=module <<'JS'
+import { createPanel } from './server.js';
+import Database from 'better-sqlite3';
+import { accessSync } from 'node:fs';
+if (typeof createPanel !== 'function') throw new Error('No se pudo cargar el servidor del panel.');
+const db = new Database(':memory:');
+db.prepare('SELECT 1').get();
+db.close();
+for (const file of ['index.html', 'app.js', 'help.js', 'style.css', 'logo.png']) {
+  accessSync(`public/${file}`);
+}
+console.log('Release verificada: imports, SQLite y archivos públicos disponibles.');
+JS
 mkdir -p "$root/releases"
 mv "$root/incoming/$release" "$root/releases/$release"
 previous=$(readlink -f "$root/current" || true)
