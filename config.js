@@ -12,6 +12,7 @@ export const modules = [
   { id: 'bis', name: 'Listas BIS y ascensos', description: 'Propuestas con /bis-proponer. Las felicitaciones usan los roles Recluta y Raider. Estas funciones no tienen interruptor de configuración independiente en el bot actual.', fields: [] }
 ];
 export const recruitmentModules = [
+  { id: 'records', name: 'Registro de recruits', description: 'Aceptados y rechazados, con comprobación de vinculación y canal Raider para los aceptados.', fields: [] },
   { id: 'discord', name: 'Discord de recruitment', description: 'Credenciales propias de este bot y autorización de oficiales.', fields: modules[0].fields.filter(f => ['DISCORD_TOKEN','DISCORD_CLIENT_ID','DISCORD_GUILD_ID','OFFICER_ROLE_IDS'].includes(f.key)) },
   { id: 'recruitment', name: 'Solicitudes y canales', description: 'Categorías de applies y raiders, y canal de transcripciones.', fields: [field('APPLY_CATEGORY_ID', 'Categoría de solicitudes', 'id'), field('RAIDER_CATEGORY_ID', 'Categoría de raiders', 'id'), field('ENTRY_CHANNEL_ID', 'Canal de transcripciones', 'id')] },
   { id: 'messages', name: 'Mensajes de recruitment', description: 'Vacío usa el texto predeterminado del bot. Variables: {user}, {character}, {realm}, {server} y {channel}; su disponibilidad depende del mensaje.', fields: [field('APPLY_RECEIVED_MESSAGE', 'Solicitud recibida', 'message'), field('APPLY_ACCEPTED_MESSAGE', 'Solicitud aceptada', 'message'), field('APPLY_REJECTED_MESSAGE', 'Solicitud rechazada', 'message')] },
@@ -19,7 +20,7 @@ export const recruitmentModules = [
   { id: 'integration', name: 'Integración con WoW Sync', description: 'DATA_DIR es la carpeta del host usada por Compose. DATABASE_PATH es la ruta del proceso; Compose la inyecta como /app/wow-role-sync-data/whitebird-wow-roles.sqlite y prevalece sobre el .env.', fields: [field('WOW_ROLE_SYNC_DATA_DIR', 'Carpeta data de sync en el host'), field('WOW_ROLE_SYNC_DATABASE_PATH', 'Ruta SQLite compartida (ejecución directa)'), field('WOW_ROLE_SYNC_BOT_ID', 'ID de usuario del bot de sync', 'id')] }
 ];
 export const rouletteModules = [
-  { id: 'discord', name: 'Discord de ruleta', description: 'Credenciales propias del bot. El ID de servidor es opcional para registrar comandos globales; el panel lo necesita para filtrar el estado SQLite.', fields: recruitmentModules[0].fields },
+  { id: 'discord', name: 'Discord de ruleta', description: 'Credenciales propias del bot. El ID de servidor es opcional para registrar comandos globales; el panel lo necesita para filtrar el estado SQLite.', fields: recruitmentModules.find(module => module.id === 'discord').fields },
   { id: 'wheel', name: 'Ruleta de alters', description: '13 clases fijas, una por persona y ronda. Publica con /ruleta-alter; ajusta roles con /alter-spec. El bot no expone parámetros para cambiar clases ni probabilidades.', fields: [] },
   { id: 'characters', name: 'Personajes y ranking', description: 'Vincula con /registrar-alter y actualiza con /ranking-alters actualizar:true. Raider.IO es público y no necesita API key; el periodo de caché está fijado a 30 minutos.', fields: [] }
 ];

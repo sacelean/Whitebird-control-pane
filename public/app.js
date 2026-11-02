@@ -130,6 +130,29 @@ function messageToolbar(input) {
   toolbar.append(variables);
   return toolbar;
 }
+function renderRecruitmentRecords(container) {
+  const status = el('p', 'Consultando registro…', 'hint');
+  const results = el('div'), more = el('button', 'Cargar más', 'secondary');
+  more.hidden = true; container.append(status, results, more);
+  let cursor;
+  const verification = value => value === null ? 'No comprobado' : value ? 'Sí' : 'No';
+  async function load() {
+    more.disabled = true;
+    try {
+      const response = await fetch(`/api/recruitment-records?project=recruitment${cursor ? `&before=${cursor}` : ''}`);
+      const data = await response.json();
+      if (!response.ok || !data.available) throw Error(data.error || data.message);
+      status.textContent = data.message;
+      results.append(table('Aceptados y rechazados', ['Fecha', 'Decisión', 'Proceso', 'Personaje', 'Reino', 'Candidato', 'Oficial', 'Motivo', 'Vinculado', 'Canal Raider creado', 'ID del canal'], data.records.map(r => [
+        new Date(r.date).toLocaleString('es-ES'), r.decision === 'aceptada' ? 'Aceptado' : 'Rechazado', r.status === 'completed' ? 'Completado' : 'Pendiente', r.character, r.realm, r.applicant, r.officer, r.reason || '—',
+        r.decision === 'aceptada' ? verification(r.linked) : '—', r.decision === 'aceptada' ? verification(r.channelCreated) : '—', r.channelId
+      ])));
+      cursor = data.next; more.hidden = !cursor;
+    } catch (error) { status.textContent = error.message; }
+    finally { more.disabled = false; }
+  }
+  more.onclick = load; load();
+}
 function renderRecords(container) {
   const preview = el('section', undefined, 'panel');
   preview.append(el('h2', 'Vista previa del informe diario'), el('p', 'Calcula los cambios previstos con datos actuales de Blizzard y Discord. No modifica roles, canales ni SQLite. No simula felicitaciones ni fallos al aplicar cambios.'));
@@ -206,6 +229,7 @@ function render() {
     const grid = el('div', undefined, 'grid');
     config.modules.forEach((m,i) => { const card = el('article', undefined, 'card'), top = el('div', undefined, 'card-top'), status = readiness(m.id); top.append(el('span', ['◈','⇄','◎','▤','♧','✧'][i % 6], 'icon'), el('span', status, `badge ${status.includes('guardad') || status === 'ID configurado' ? 'ready' : ''}`)); const button = el('button', m.fields.length ? 'Configurar módulo →' : 'Ver módulo →'); button.onclick = () => navigate(m.id); card.append(top, el('h3',m.name), el('p',m.description), button); grid.append(card); }); content.append(grid); renderState(content);
   } else {
+    if (page === 'records' && config.project.id === 'recruitment') renderRecruitmentRecords(content);
     if (page === 'daily-report') renderRecords(content);
     if (page === 'cauldrons') content.append(el('p', 'Cambia las asignaciones desde Discord con /calderos-asignar; el bot actualizará el mensaje del reparto automáticamente. Usa /calderos-publicar para publicar o mover ese mensaje.', 'hint'));
     if (module.fields.length) {

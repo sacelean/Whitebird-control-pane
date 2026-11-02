@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { recruitmentRecords } from './recruitment-records.js';
 import { readAudit } from './audit.js';
 import { dailyReport } from './daily-report.js';
 import http from 'node:http';
@@ -56,6 +57,11 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, list);
     }
     const project = projects.find(p => p.id === (url.searchParams.get('project') || 'wow'));
+    if (url.pathname === '/api/recruitment-records' && req.method === 'GET') {
+      if (project?.id !== 'recruitment') return send(res, 404, { error: 'Disponible solo para Recruitment.' });
+      const env = parse(await readEnv(project));
+      return send(res, 200, recruitmentRecords(env, project.base, url.searchParams.get('before')));
+    }
     if (['/api/daily-report', '/api/audit'].includes(url.pathname) && req.method === 'GET') {
       if (project?.id !== 'wow') return send(res, 404, { error: 'Disponible solo para WoW Role Sync.' });
       const env = parse(await readEnv(project));
