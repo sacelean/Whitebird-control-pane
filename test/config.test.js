@@ -60,3 +60,17 @@ test('guarda IDs y valores simples sin comillas y repara el formato antiguo', ()
   assert.ok(saved.includes('OTHER=`ajeno`'));
   assert.equal(update(saved, {}), saved);
 });
+
+test('rechazo multilínea: repara backticks y conserva el mensaje corregido manualmente', () => {
+  const message = 'Antes de nada, gracias por el apply.\n\nLo hemos revisado con calma, pero en este momento no podemos incorporarte en el roster. La decisión no es personal; con la composición actual no vemos que podamos incluirte en la raid.\n\nUn saludo y suerte. 💪';
+  const legacy = `# Recruitment\nAPPLY_REJECTED_MESSAGE=\`${message}\`\nENTRY_CHANNEL_ID=123456789012345678\n`;
+  const repaired = update(legacy, { APPLY_QUESTION_CHARACTER: 'Personaje principal' }, recruitmentModules);
+  assert.ok(repaired.includes(`APPLY_REJECTED_MESSAGE='${message}'`));
+  assert.equal(parse(repaired).APPLY_REJECTED_MESSAGE, message);
+  assert.equal(parse(repaired).ENTRY_CHANNEL_ID, '123456789012345678');
+  assert.equal((repaired.match(/Lo hemos revisado/g) || []).length, 1);
+  const changed = message.replace('Antes de nada', 'Hola {user}, antes de nada');
+  const saved = update(repaired, { APPLY_REJECTED_MESSAGE: changed }, recruitmentModules);
+  assert.equal(parse(saved).APPLY_REJECTED_MESSAGE, changed);
+  assert.equal((saved.match(/Lo hemos revisado/g) || []).length, 1);
+});

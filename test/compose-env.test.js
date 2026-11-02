@@ -19,8 +19,11 @@ test('dotenv y Compose leen los mismos valores guardados para los tres bots', { 
       [recruitmentModules, { APPLY_RECEIVED_MESSAGE: '**Hola {user}**\n`código` y "comillas"\nVARIABLE=texto # literal $HOME', APPLY_ACCEPTED_MESSAGE: "¡Hola! Tu solicitud está aceptada, it's done.", APPLY_REJECTED_MESSAGE: '', WOW_ROLE_SYNC_DATA_DIR: '/srv/wow/data', OFFICER_ROLE_IDS: '123456789012345678, 234567890123456789' }],
       [rouletteModules, { DISCORD_GUILD_ID: '123456789012345678', DISCORD_CLIENT_ID: '234567890123456789', DISCORD_TOKEN: 'token.normal-123' }]
     ];
+    const rejection = 'Gracias por el apply.\n\nLo hemos revisado con calma, pero en este momento no podemos incorporarte en el roster.\n\nUn saludo y suerte. 💪';
+    cases.push([recruitmentModules, { APPLY_REJECTED_MESSAGE: rejection }]);
     for (const [selectedModules, values] of cases) {
-      const saved = update('DISCORD_TOKEN=`old-token`\n', values, selectedModules);
+      const original = 'DISCORD_TOKEN=`old-token`\n' + (values.APPLY_REJECTED_MESSAGE ? `APPLY_REJECTED_MESSAGE=\x60${values.APPLY_REJECTED_MESSAGE}\x60\n` : '');
+      const saved = update(original, values, selectedModules);
       writeFileSync(envFile, saved);
       // config resolves env_file without starting containers or accessing the daemon.
       const result = spawnSync('docker', ['compose', '--env-file', envFile, '-f', compose, 'config', '--format', 'json'], { encoding: 'utf8' });
