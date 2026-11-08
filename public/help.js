@@ -46,14 +46,13 @@ export const botCommands = {
   wow: [
     command('informe-raiders', 'Publica o actualiza la tabla semanal de raiders. canal permite elegir el destino; sin él se usa el destino guardado. La primera vez debes indicar canal para guardar el destino.', '/informe-raiders [canal:#raiders]'),
     command('bis-proponer', 'Envía al canal del raider vinculado una propuesta de lista BIS para aceptar o rechazar. actividad: General, Raid o Mítico+.', '/bis-proponer raider:<@miembro> actividad:<General|Raid|Mítico+>'),
-    command('vinculacion-buscar', 'Busca tu main comparando tu nombre de Discord con el roster de Blizzard para proponer una vinculación.', '/vinculacion-buscar', 'Miembros'),
     command('vinculacion-asignar', 'Vincula un usuario de Discord con su personaje principal y reino para poder sincronizarlo.', '/vinculacion-asignar usuario:<@miembro> personaje:<nombre> reino:<reino>'),
     command('vinculacion-quitar', 'Elimina la vinculación del usuario con su personaje de WoW.', '/vinculacion-quitar usuario:<@miembro>'),
     command('sincronizacion-ejecutar', 'Ejecuta manualmente la sincronización de roles de rango y profesión de los miembros vinculados.', '/sincronizacion-ejecutar'),
     command('sincronizacion-usuario', 'Ejecuta la sincronización solo para un usuario que ya está vinculado.', '/sincronizacion-usuario usuario:<@miembro>'),
     command('auditoria-revisar', 'Comprueba las vinculaciones, los roles, el roster, los canales y los calderos para detectar problemas de configuración.', '/auditoria-revisar'),
     command('historial-cambios', 'Consulta los últimos cambios de roles. usuario filtra por miembro y limite permite pedir entre 1 y 25 registros.', '/historial-cambios [usuario:@miembro] [limite:10]'),
-    command('vinculacion-listar', 'Muestra las vinculaciones guardadas y las propuestas pendientes.', '/vinculacion-listar'),
+    command('vinculacion-listar', 'Muestra las vinculaciones guardadas y los personajes sin vincular.', '/vinculacion-listar'),
     command('calderos-asignar', 'Asigna a un miembro el caldero de un día y actualiza el reparto público. dia: lunes a jueves; tipo: Potis o Frascos.', '/calderos-asignar dia:<día> tipo:<Potis|Frascos> usuario:<@miembro>'),
     command('calderos-publicar', 'Publica el mensaje del reparto de calderos o lo mueve al canal indicado.', '/calderos-publicar canal:<#crafteos>'),
     command('calderos-ver', 'Muestra de forma privada el reparto actual de calderos.', '/calderos-ver')
