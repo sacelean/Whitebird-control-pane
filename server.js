@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { createAgentApi } from './agent-api.js';
 import { recruitmentRecords } from './recruitment-records.js';
 import { readAudit } from './audit.js';
 import { dailyReport } from './daily-report.js';
@@ -18,6 +19,7 @@ const botsRoot = resolve(here, '..');
 export function createPanel({ restartEnabled = process.env.PANEL_RESTART_ENABLED === 'true', execute = runCompose, envPath = resolve(process.env.PANEL_ENV_PATH || join(botsRoot, 'whitebird-wow-role-sync/.env')), port = Number(process.env.PANEL_PORT || 3080), recruitmentEnvPath = resolve(process.env.PANEL_RECRUITMENT_ENV_PATH || join(botsRoot, 'whitebird-recruitment-bot/.env')), rouletteEnvPath = resolve(process.env.PANEL_ROULETTE_ENV_PATH || join(botsRoot, 'whitebird-wow-wheel/.env')) } = {}) {
 const origin = `http://127.0.0.1:${port}`;
 const csrf = randomBytes(32).toString('hex');
+const agentApi = createAgentApi();
 let saving = false;
 const projects = [
   { id: 'wow', name: 'WoW Role Sync', path: envPath, modules, base: dirname(envPath) },
@@ -48,6 +50,7 @@ const server = http.createServer(async (req, res) => {
   if (req.headers.host !== `127.0.0.1:${port}` || (req.headers.origin && req.headers.origin !== origin)) return send(res, 403, { error: 'Origen no permitido.' });
   try {
     const url = new URL(req.url, origin);
+    if (url.pathname === '/api/agent') return await agentApi(req, res, { csrf, send });
     if (url.pathname === '/api/projects' && req.method === 'GET') {
       const list = await Promise.all(projects.map(async p => {
         let available = false;
@@ -115,7 +118,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { ok: true, message: 'Guardado. Recrea el contenedor del bot para aplicar los cambios.' });
       } finally { saving = false; }
     }
-    const files = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/help.js': ['help.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'], '/logo.png': ['logo.png', 'image/png'] };
+    const files = { '/agent.js': ['agent.js', 'text/javascript'], '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/help.js': ['help.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'], '/logo.png': ['logo.png', 'image/png'] };
     if (req.method === 'GET' && files[req.url]) {
       const [file, type] = files[req.url];
       res.setHeader('Content-Type', type.startsWith('text/') ? `${type}; charset=utf-8` : type); return res.end(await readFile(join(here, 'public', file)));
@@ -129,3 +132,4 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const port = Number(process.env.PANEL_PORT || 3080);
   createPanel({ port }).listen(port, '127.0.0.1', () => console.log(`Whitebird Control: http://127.0.0.1:${port}`));
 }
+
