@@ -1,6 +1,6 @@
 # Whitebird · Centro de control
 
-Proyecto independiente para administrar WoW Role Sync, Recruitment y Ruleta mediante un selector de bots, con archivos de configuración separados. Permite recrear los bots con Docker Compose cuando se habilita esa opción.
+Proyecto independiente para administrar WoW Role Sync, Recruitment, Ruleta y Whitebird IA mediante un selector, con archivos de configuración separados. Permite recrear los bots con Docker Compose cuando se habilita esa opción; los componentes IA se aplican manualmente con systemd.
 
 ## Organización independiente
 
@@ -128,3 +128,36 @@ recreación, no la conexión a Discord. Si falla o expira el tiempo, los cambios
 siguen guardados y debes consultar `docker compose ps` y los logs del bot
 antes de repetir. El panel no devuelve la salida de Compose para evitar
 exponer credenciales.
+
+## Whitebird IA: servicio y bot Discord
+
+El proyecto real es `whitebird-ai-agent`. El selector incluye dos componentes
+porque usan archivos independientes:
+
+- **Whitebird IA · Servicio**: API local, token compartido, modelo llama-server,
+  equipo WoWAudit y configuración MCP/OAuth. Ruta: `PANEL_AGENT_ENV_PATH`
+  (por defecto `../whitebird-ai-agent/.env`). En OCI indica el archivo compartido
+  `agent.env` que lee el servicio, fuera de las releases.
+- **Whitebird IA · Bot Discord**: token propio `DISCORD_BOT_TOKEN`,
+  `DISCORD_APPLICATION_ID`, servidor, canales y roles permitidos, URL del agente
+  y token compartido. Ruta: `PANEL_AGENT_DISCORD_ENV_PATH`
+  (por defecto `../whitebird-ai-agent/discord.env`). Incluye guía de `/whitebird-ask`.
+
+Los archivos deben existir; el panel no crea credenciales ni sesiones OAuth.
+No se consulta SQLite para estos componentes. Los secretos no se devuelven al
+navegador. Guardar modifica solo el archivo del componente seleccionado.
+Después aplica manualmente los cambios reiniciando `whitebird-ai-agent` o
+`whitebird-ai-discord` con systemd; el botón Docker queda deshabilitado.
+El usuario de los servicios debe poder leer los archivos tras guardarlos (0600).
+
+El chat emergente sigue siendo global e independiente del selector. Para
+conectarlo configura `PANEL_AGENT_URL` y `PANEL_AGENT_TOKEN` en el entorno del
+panel y reinicia el panel. Cambiar `AGENT_PORT` o `AGENT_API_TOKEN` no propaga
+cambios al panel ni al otro componente: actualiza sus URL y secretos coincidentes.
+El login OAuth se hace fuera del panel, con el servicio IA detenido.
+Los formularios no acreditan disponibilidad del agente, Discord, modelo u OAuth.
+
+Campos contrastados el 2026-11-14 con `.env.example`, `src/server.js`,
+`src/agent.js`, `src/discord.js` y `deploy/whitebird-ai-agent.service` de la copia
+local del agente. El main remoto revisado aún no contiene los adaptadores;
+verifica la revisión instalada antes de aplicar o desplegar.

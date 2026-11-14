@@ -112,3 +112,23 @@ en `incoming/` o una release sin activar.
 
 El despliegue solo reinicia el panel. Los cambios guardados en los bots se
 aplican con los comandos de recreación descritos en el README principal.
+
+## Administración del agente IA desde el selector
+
+Configura en el entorno del panel `PANEL_AGENT_ENV_PATH` y
+`PANEL_AGENT_DISCORD_ENV_PATH` con las rutas absolutas de los archivos existentes
+que leen los servicios IA y Discord. La instalación documentada del agente usa
+archivos `agent.env` y `discord.env` compartidos fuera de las releases; no apuntes
+a una copia de ejemplo. El panel necesita permisos de lectura, escritura y
+reemplazo atómico en sus directorios. Tras guardar, los archivos quedan con
+modo 0600 y propietario del usuario del panel: asegúrate de que los servicios
+puedan seguir leyéndolos. No des acceso al archivo de sesión OAuth al panel.
+
+Guardar no reinicia estos servicios. Como administrador, aplica los cambios con
+`sudo systemctl restart whitebird-ai-agent` o
+`sudo systemctl restart whitebird-ai-discord`, según el archivo modificado.
+El panel no añade reglas sudo ni ejecuta systemctl. Si cambias el secreto o el
+puerto compartido, actualiza también sus consumidores (`PANEL_AGENT_TOKEN`,
+`PANEL_AGENT_URL`, `AGENT_API_TOKEN` y `DISCORD_AGENT_URL`) antes de verificar.
+El registro de `/whitebird-ask` y el login OAuth se realizan desde el proyecto
+del agente conforme a sus guías; no son acciones del panel.

@@ -149,3 +149,47 @@ test('reinicio deshabilitado y fallo Docker no devuelven salida con secretos', a
     }
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test('IA: lista ambos archivos, guarda por separado y rechaza reinicio Docker', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'whitebird-agent-panel-'));
+  const agentEnvPath = join(dir, 'agent.env'), agentDiscordEnvPath = join(dir, 'discord.env');
+  const original = 'AGENT_API_TOKEN=secret-agent-token-with-32-characters\nLLAMA_MODEL=local\nOTHER=keep\n';
+  const discord = 'DISCORD_BOT_TOKEN=private-discord\nDISCORD_GUILD_ID=123456789012345678\n';
+  await writeFile(agentEnvPath, original); await writeFile(agentDiscordEnvPath, discord);
+  let calls = 0;
+  const port = 19393, base = `http://127.0.0.1:${port}`;
+  const server = createPanel({ port, agentEnvPath, agentDiscordEnvPath, restartEnabled: true, execute: async () => { calls++; } });
+  try {
+    await new Promise(resolve => server.listen(port, '127.0.0.1', resolve));
+    const projects = await (await fetch(`${base}/api/projects`)).json();
+    assert.equal(projects.find(p => p.id === 'agent').available, true);
+    assert.equal(projects.find(p => p.id === 'agent-discord').available, true);
+    for (const project of ['agent', 'agent-discord']) {
+      const config = await (await fetch(`${base}/api/config?project=${project}`)).json();
+      assert.equal(config.restartEnabled, false);
+      assert.equal(config.project.manualRestart, true);
+      assert.equal(config.project.commands, project === 'agent-discord');
+      assert.equal(config.state.available, false);
+      assert.ok(!config.state.message.includes('SQLite no disponible'));
+      assert.ok(!JSON.stringify(config).includes('secret-agent-token'));
+      assert.ok(!JSON.stringify(config).includes('private-discord'));
+      const changes = project === 'agent' ? { LLAMA_MODEL: 'new-model' } : { DISCORD_CHANNEL_IDS: '234567890123456789' };
+      const headers = { 'X-Panel-CSRF': config.csrf, 'Content-Type': 'application/json' };
+      const result = await fetch(`${base}/api/config?project=${project}`, { method: 'PUT', headers, body: JSON.stringify({ revision: config.revision, changes }) });
+      assert.equal(result.status, 200);
+      assert.match((await result.json()).message, /systemd/);
+      const restart = await fetch(`${base}/api/restart?project=${project}`, { method: 'POST', headers });
+      assert.equal(restart.status, 403);
+      assert.match((await restart.json()).error, /systemd/);
+      if (project === 'agent') assert.equal(await readFile(agentDiscordEnvPath, 'utf8'), discord);
+    }
+    const saved = await readFile(agentEnvPath, 'utf8');
+    assert.match(saved, /LLAMA_MODEL=new-model/);
+    assert.match(saved, /OTHER=keep/);
+    assert.ok(!saved.includes('DISCORD_CHANNEL_IDS'));
+    assert.equal(calls, 0);
+    await rm(agentDiscordEnvPath);
+    const unavailable = await (await fetch(`${base}/api/projects`)).json();
+    assert.equal(unavailable.find(p => p.id === 'agent-discord').available, false);
+  } finally { await new Promise(resolve => server.close(resolve)); await rm(dir, { recursive: true, force: true }); }
+});

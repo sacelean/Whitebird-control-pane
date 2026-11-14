@@ -1,5 +1,20 @@
-// Ayuda revisada contra los campos y comandos registrados de los tres bots.
+// Ayuda revisada contra los campos y comandos de los bots y el agente IA.
 export const fieldHelp = {
+  AGENT_PORT: 'Puerto HTTP local del servicio IA. Si lo cambias, actualiza también PANEL_AGENT_URL y DISCORD_AGENT_URL. Por defecto 3090.',
+  AGENT_API_TOKEN: 'Secreto de al menos 32 caracteres, compartido por el servicio IA, el adaptador Discord y PANEL_AGENT_TOKEN del panel. Cambiarlo aquí no actualiza los otros archivos.',
+  LLAMA_CHAT_URL: 'Endpoint HTTP de chat de llama-server, limitado a loopback. Por defecto http://127.0.0.1:8080/v1/chat/completions.',
+  LLAMA_MODEL: 'Nombre de modelo enviado a llama-server. No descarga ni sustituye el archivo GGUF del modelo.',
+  WOWAUDIT_MCP_URL: 'Endpoint HTTPS del servidor MCP de WoWAudit. El agente solo utiliza herramientas de lectura.',
+  WOWAUDIT_OAUTH_STORE: 'Ruta del archivo privado de sesión OAuth en el host del agente, fuera de las releases. El panel solo edita la ruta; no abre ni devuelve su contenido.',
+  WOWAUDIT_OAUTH_REDIRECT_URL: 'Callback local para el login OAuth manual. Por defecto http://127.0.0.1:8787/callback. El servicio IA debe estar detenido durante el login.',
+  WOWAUDIT_OAUTH_CLIENT_ID: 'Client ID de un cliente OAuth previamente registrado, si corresponde. Opcional cuando se usa registro dinámico.',
+  WOWAUDIT_OAUTH_ISSUER: 'Issuer HTTPS oficial del cliente OAuth registrado. Configúralo solo según la autorización de WoWAudit.',
+  WOWAUDIT_OAUTH_CLIENT_SECRET: 'Secreto privado del cliente OAuth, solo cuando el registro lo exige. No es la sesión OAuth ni un token de ChatGPT.',
+  DISCORD_BOT_TOKEN: 'Token privado de la aplicación Discord del agente IA. Se conserva en discord.env, separado de agent.env.',
+  DISCORD_APPLICATION_ID: 'Application ID de la aplicación del agente IA, usado para registrar /whitebird-ask.',
+  DISCORD_CHANNEL_IDS: 'Canales autorizados para /whitebird-ask, separados por comas. Debe haber al menos uno para iniciar el adaptador.',
+  DISCORD_ROLE_IDS: 'Roles autorizados para /whitebird-ask, separados por comas. Se exige uno de estos roles incluso a quienes tienen Gestionar servidor.',
+  DISCORD_AGENT_URL: 'Origen HTTP del agente en 127.0.0.1, sin ruta ni credenciales. Por defecto http://127.0.0.1:3090.',
   DISCORD_TOKEN: 'Credencial privada con la que este bot inicia sesión en Discord. Usa el token de su aplicación en Discord Developer Portal; sustitúyelo si lo regeneras.',
   DISCORD_CLIENT_ID: 'Application ID de la aplicación de este bot en Discord Developer Portal. Se usa para registrar sus comandos de barra en Discord.',
   DISCORD_GUILD_ID: 'ID del servidor de Discord que administra el bot. Activa el modo desarrollador de Discord para copiarlo. En ruleta también permite filtrar los registros del panel; vacío registra comandos globales.',
@@ -43,6 +58,7 @@ export const fieldHelp = {
 // Los parámetros entre < > son obligatorios; los que van entre [ ] son opcionales.
 const command = (name, description, usage, access = 'Oficiales') => ({ name, description, usage, access });
 export const botCommands = {
+  'agent-discord': [command('whitebird-ask', 'Consulta WoWAudit mediante el agente IA. Respuesta privada, pregunta de hasta 1000 caracteres y espera de 30 segundos entre consultas.', '/whitebird-ask pregunta:<tu pregunta>', 'Roles y canales permitidos del agente')],
   wow: [
     command('informe-raiders', 'Publica o actualiza la tabla semanal de raiders. canal permite elegir el destino; sin él se usa el destino guardado. La primera vez debes indicar canal para guardar el destino.', '/informe-raiders [canal:#raiders]'),
     command('bis-proponer', 'Envía al canal del raider vinculado una propuesta de lista BIS para aceptar o rechazar. actividad: General, Raid o Mítico+.', '/bis-proponer raider:<@miembro> actividad:<General|Raid|Mítico+>'),

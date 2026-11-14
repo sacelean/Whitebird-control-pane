@@ -128,3 +128,20 @@ button.info-button:hover, button.info-button:focus-visible { color: #ffe4aa; bor
 .audit-filters .audit-filter:first-child { flex: 1; min-width: 180px; }
 
 .project-label label { color: inherit; font-size: inherit; letter-spacing: inherit; }
+
+.agent-launcher { position: fixed; right: 24px; bottom: 100px; z-index: 4; border-radius: 28px; padding: 14px 22px; }
+.agent-dialog { width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 24px; border: 1px solid #8c7240; border-radius: 14px; background: #101d30; color: #e1e8f5; box-shadow: 0 20px 80px #0009; overflow-y: auto; }
+.agent-dialog::backdrop { background: #030914b8; }
+.agent-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.agent-heading h2 { margin: 0; }
+.agent-heading button { flex-shrink: 0; }
+.agent-messages { height: min(300px, 32dvh); overflow-y: auto; margin: 18px 0; padding: 12px; background: #091323; border: 1px solid #354966; border-radius: 8px; }
+.agent-message { margin: 10px 0; padding: 12px; border-radius: 8px; background: #172a43; overflow-wrap: anywhere; }
+.agent-message strong { color: #edcf8c; font-size: 12px; }
+.agent-message p { margin-bottom: 0; white-space: pre-wrap; color: #e1e8f5; }
+.agent-user { margin-left: 28px; background: #24324a; }
+.agent-assistant { margin-right: 28px; }
+.agent-dialog textarea { height: 80px; }
+#agent-submit { margin-top: 12px; }
+#agent-status { font-size: 12px; }
+@media (max-width: 700px) { .agent-launcher { bottom: 170px; right: 16px; } .agent-dialog { padding: 18px; } }

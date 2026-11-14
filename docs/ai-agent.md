@@ -36,3 +36,16 @@ detalles internos. Las respuestas se presentan como texto, nunca HTML.
 
 Las pruebas locales de la integración usan dobles de MCP/modelo. No acreditan
 OAuth, disponibilidad de Oracle ni calidad de la síntesis en producción.
+
+## Interfaz del chat (2026-11-14)
+
+El botón flotante «Asistente IA» abre un diálogo independiente de los módulos
+ y de Comandos de Discord. Permite cerrar con Escape o el botón Cerrar y
+conserva los mensajes mientras la página siga abierta, incluso al cambiar de
+módulo. El historial es visual: la API sigue recibiendo una pregunta cada vez,
+sin contexto de mensajes anteriores. Cerrar la ventana no cancela una consulta.
+
+Si falta configuración, el chat explica qué variables debe configurar el
+administrador y permite comprobar de nuevo la conexión tras reiniciar el
+panel. La disponibilidad inicial indica configuración, no salud del agente.
+Este cambio de interfaz no instala ni configura el servicio de IA.

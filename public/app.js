@@ -46,8 +46,13 @@ function fieldCaption(caption, id, description) {
   row.append(label, infoButton(caption, description)); return row;
 }
 function renderCommands(container) {
+  if (config.project.id === 'agent-discord') {
+    container.append(el('p', 'Usa /whitebird-ask pregunta:<tu pregunta> en un canal permitido y con uno de los roles configurados. La respuesta es privada. Debes esperar 30 segundos entre preguntas; solo se procesa una consulta a la vez.', 'hint'));
+    container.append(el('p', 'Registra el comando desde el proyecto del agente: node --env-file=/ruta/discord.env src/discord.js --register. Guardar aquí no registra comandos ni inicia el bot.'));
+  } else {
   container.append(el('p', 'Consulta los comandos que debes escribir en Discord con el bot seleccionado. < > indica un parámetro obligatorio; [ ] indica uno opcional. No escribas los corchetes.', 'hint'));
   container.append(el('p', 'Los oficiales son miembros con el permiso Gestionar servidor o alguno de los roles configurados en OFFICER_ROLE_IDS.'));
+  }
   const list = el('div', undefined, 'command-list');
   for (const command of botCommands[config.project.id] || []) {
     const card = el('article', undefined, 'panel command-card');
@@ -61,6 +66,7 @@ function message(text, error = false) { $('notice').textContent = text; $('notic
 function dirty() { document.querySelectorAll('#content input, #content textarea, #content .config-field button:not(.info-button), #content .editor-toolbar select').forEach(node => { node.disabled = busy; }); $('restart').disabled = busy || !config?.restartEnabled || Object.keys(pending).length > 0; $('restart').title = !config?.restartEnabled ? 'Activa PANEL_RESTART_ENABLED en el servidor' : Object.keys(pending).length ? 'Guarda los cambios antes de reiniciar' : 'Recrea únicamente el bot seleccionado'; $('project').disabled = busy; $('reload').disabled = busy; const count = Object.keys(pending).length; $('changes').textContent = count ? `${count} ajuste${count === 1 ? '' : 's'} sin guardar` : 'Sin cambios pendientes'; $('save').disabled = !count || busy; $('discard').disabled = !count || busy; }
 function readiness(id) {
   const v = config.values, s = config.secrets;
+  if (config.project.manualRestart) return 'Configuración guardada';
   if (config.project.id === 'roulette' && id !== 'discord') return 'Gestión en Discord';
   if (config.project.id === 'recruitment' && id !== 'discord') return 'Configuración guardada';
   if (id === 'daily-report') return 'Vista previa y registros';
@@ -210,16 +216,21 @@ function render() {
   if (!config) return;
   closeHelp();
   const content = $('content'); content.replaceChildren();
+  $('restart').textContent = config.project.manualRestart ? 'Reinicio manual con systemd' : 'Aplicar guardado y reiniciar';
   document.querySelectorAll('[data-page]').forEach(b => b.classList.toggle('active', b.dataset.page === page));
   const module = page === 'commands' ? { name: 'Comandos de Discord', description: `Guía de uso de los comandos de ${config.project.name}.`, fields: [] } : config.modules.find(m => m.id === page);
   $('breadcrumb').textContent = `${config.project.name} / ${module?.name || 'Vista general'}`;
   $('title').textContent = module?.name || 'Tu servidor, en un solo lugar.';
   $('subtitle').textContent = module?.description || 'Consulta la configuración y organiza las funciones de la hermandad por módulos.';
   content.append(el('p', config.runtime, 'hint'));
-  if (page === 'commands') { renderCommands(content); dirty(); return; }
+  if (page === 'commands') { renderCommands(content); dirty(); if (config.project.manualRestart) $('restart').title = 'Reinicia el servicio systemd después de guardar'; return; }
   if (!module) {
     const stats = el('div', undefined, 'stats');
-    const summary = config.project.id === 'roulette'
+    const summary = config.project.id === 'agent'
+      ? [['Equipo WoWAudit', config.values.WOWAUDIT_TEAM_ID || 'Sin configurar'], ['Modelo local', config.values.LLAMA_MODEL || 'local'], ['Token del servicio', config.secrets.AGENT_API_TOKEN ? 'Guardado' : 'Sin configurar']]
+      : config.project.id === 'agent-discord'
+      ? [['Servidor Discord', config.values.DISCORD_GUILD_ID || 'Sin configurar'], ['Canales permitidos', config.values.DISCORD_CHANNEL_IDS || 'Sin configurar'], ['Token del bot', config.secrets.DISCORD_BOT_TOKEN ? 'Guardado' : 'Sin configurar']]
+      : config.project.id === 'roulette'
       ? [['Servidor Discord', config.values.DISCORD_GUILD_ID || 'Sin configurar'], ['Clases asignadas', config.state.available ? config.state.assignments.length : 'No disponible'], ['Personajes vinculados', config.state.available ? config.state.characters.length : 'No disponible']]
       : config.project.id === 'recruitment'
       ? [['Servidor Discord', config.values.DISCORD_GUILD_ID || 'Sin configurar'], ['Categoría de solicitudes', config.values.APPLY_CATEGORY_ID || 'Sin configurar'], ['Categoría de raiders', config.values.RAIDER_CATEGORY_ID || 'Sin configurar']]
@@ -253,18 +264,21 @@ function render() {
         if (f.type === 'secret') { const clear = el('button', 'Eliminar credencial guardada', 'secondary'); clear.type = 'button'; clear.onclick = e => { e.preventDefault(); pending[f.key] = ''; input.value = ''; input.placeholder = 'Se eliminará al guardar'; dirty(); }; label.append(clear); }
         grid.append(label);
       }); form.append(grid); content.append(form);
-      content.append(el('p', `Los secretos vacíos se conservan salvo que pulses «Eliminar credencial guardada». Guarda los cambios y pulsa «Aplicar guardado y reiniciar», o ejecuta desde el proyecto: docker compose up -d --force-recreate ${config.project.id === 'roulette' ? 'whitebird-wow-wheel' : 'bot'}.`, 'hint warning'));
+      content.append(el('p', config.project.manualRestart
+        ? `Los secretos vacíos se conservan salvo que pulses «Eliminar credencial guardada». Tras guardar, reinicia manualmente ${config.project.id === 'agent' ? 'whitebird-ai-agent' : 'whitebird-ai-discord'} con systemd. El servicio debe leer el mismo archivo configurado en el panel. Cambiar el puerto o el token del agente requiere actualizar también el panel y Discord. El login OAuth se realiza fuera del panel, con el servicio IA detenido.`
+        : `Los secretos vacíos se conservan salvo que pulses «Eliminar credencial guardada». Guarda los cambios y pulsa «Aplicar guardado y reiniciar», o ejecuta desde el proyecto: docker compose up -d --force-recreate ${config.project.id === 'roulette' ? 'whitebird-wow-wheel' : 'bot'}.`, 'hint warning'));
     }
     if (page === 'audit') content.append(el('p', 'Informe: miércoles a las 20:00. Avisos de equipo: cada día a las 22:00. Ambos usan Europe/Madrid, fijado en el bot. Configura el destino con /informe-raiders.', 'hint'));
     if (page === 'bis') content.append(el('p', 'Las propuestas BIS y los ascensos se gestionan desde el bot. Esta primera versión del panel no edita listas ni mensajes de Discord.', 'hint'));
     renderState(content, page);
   }
   dirty();
+  if (config.project.manualRestart) $('restart').title = 'Reinicia el servicio systemd después de guardar';
 }
 function navigate(next) { if (busy) return; page = next; render(); window.scrollTo({ top: 0 }); }
 async function load() {
   const response = await fetch(`/api/config?project=${selectedProject}`); const data = await response.json(); if (!response.ok) throw Error(data.error || 'Error al cargar.'); config = data;
-  const nav = $('navigation'); nav.replaceChildren(); [...config.modules, { id: 'commands', name: 'Comandos de Discord' }].forEach(m => { const b = el('button',m.name); b.dataset.page = m.id; b.onclick = () => navigate(m.id); nav.append(b); }); render();
+  const nav = $('navigation'); nav.replaceChildren(); [...config.modules, ...(config.project.commands === false ? [] : [{ id: 'commands', name: 'Comandos de Discord' }])].forEach(m => { const b = el('button',m.name); b.dataset.page = m.id; b.onclick = () => navigate(m.id); nav.append(b); }); render();
 }
 const projectCaption = fieldCaption('BOT / ADDON', 'project', 'Selecciona el bot cuya configuración, registros y comandos quieres consultar. Cada bot tiene su propio archivo de configuración.');
 projectCaption.classList.add('project-label');

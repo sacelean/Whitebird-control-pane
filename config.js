@@ -24,6 +24,15 @@ export const rouletteModules = [
   { id: 'wheel', name: 'Ruleta de alters', description: '13 clases fijas, una por persona y ronda. Publica con /ruleta-alter; ajusta roles con /alter-spec. El bot no expone parámetros para cambiar clases ni probabilidades.', fields: [] },
   { id: 'characters', name: 'Personajes y ranking', description: 'Vincula con /registrar-alter y actualiza con /ranking-alters actualizar:true. Raider.IO es público y no necesita API key; el periodo de caché está fijado a 30 minutos.', fields: [] }
 ];
+export const agentModules = [
+  { id: 'agent-api', name: 'Servicio de IA', description: 'API local compartida por el chat del panel y Discord. El token debe coincidir con PANEL_AGENT_TOKEN y con el adaptador Discord.', fields: [field('AGENT_PORT', 'Puerto local del agente', 'port', '3090'), field('AGENT_API_TOKEN', 'Token compartido del agente', 'secret')] },
+  { id: 'model', name: 'Modelo local', description: 'Conexión con llama-server. Cambiar estos campos no instala ni descarga modelos.', fields: [field('LLAMA_CHAT_URL', 'URL de chat del modelo', 'model-url', 'http://127.0.0.1:8080/v1/chat/completions'), field('LLAMA_MODEL', 'Nombre del modelo', 'text', 'local')] },
+  { id: 'mcp', name: 'WoWAudit MCP y OAuth', description: 'Consultas de solo lectura. El login OAuth se realiza fuera del panel; aquí no se lee ni modifica el archivo de sesión.', fields: [field('WOWAUDIT_MCP_URL', 'Endpoint MCP', 'https-url', 'https://wowaudit.com/mcp'), field('WOWAUDIT_TEAM_ID', 'ID del equipo', 'positive', '66082'), field('WOWAUDIT_OAUTH_STORE', 'Ruta del almacén OAuth'), field('WOWAUDIT_OAUTH_REDIRECT_URL', 'URL de callback OAuth', 'callback-url', 'http://127.0.0.1:8787/callback'), field('WOWAUDIT_OAUTH_CLIENT_ID', 'Client ID OAuth (opcional)'), field('WOWAUDIT_OAUTH_ISSUER', 'Issuer OAuth (opcional)', 'https-url'), field('WOWAUDIT_OAUTH_CLIENT_SECRET', 'Client Secret OAuth (opcional)', 'secret')] }
+];
+export const agentDiscordModules = [
+  { id: 'discord', name: 'Discord del agente IA', description: 'Credenciales y permisos del adaptador. Requiere tanto un canal permitido como uno de los roles permitidos; Gestionar servidor no evita estas restricciones.', fields: [field('DISCORD_BOT_TOKEN', 'Token del bot IA', 'secret'), field('DISCORD_APPLICATION_ID', 'Application ID', 'id'), field('DISCORD_GUILD_ID', 'ID del servidor', 'id'), field('DISCORD_CHANNEL_IDS', 'Canales permitidos (IDs separados por comas)', 'ids'), field('DISCORD_ROLE_IDS', 'Roles permitidos (IDs separados por comas)', 'ids')] },
+  { id: 'agent-connection', name: 'Conexión al servicio IA', description: 'El adaptador llama al servicio local. No accede directamente al modelo ni al almacén OAuth.', fields: [field('DISCORD_AGENT_URL', 'URL local del agente', 'agent-url', 'http://127.0.0.1:3090'), field('AGENT_API_TOKEN', 'Token compartido del agente', 'secret')] }
+];
 export const fields = modules.flatMap(m => m.fields);
 export const revision = text => createHash('sha256').update(text).digest('hex');
 export function view(text, selectedModules = modules) {
@@ -50,6 +59,17 @@ export function update(text, changes, selectedModules = modules) {
     const f = fields.find(f => f.key === key);
     if (!f || typeof value !== 'string' || value.length > 8000 || (f.type === 'message' ? /[\r\0]/ : /[\r\n\0]/).test(value)) throw Error(`Valor no válido: ${key}`);
     if (value) {
+      if (f.key === 'AGENT_API_TOKEN' && value.length < 32) throw Error('El token del agente requiere al menos 32 caracteres.');
+      if (f.type === 'port' && (!/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 65535)) throw Error(`${f.label}: usa un puerto de 1 a 65535.`);
+      if (['model-url', 'agent-url', 'https-url', 'callback-url'].includes(f.type)) {
+        let url;
+        try { url = new URL(value); } catch { throw Error(`${f.label}: URL no válida.`); }
+        const local = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
+        const valid = f.type === 'https-url' ? url.protocol === 'https:'
+          : f.type === 'agent-url' ? url.protocol === 'http:' && url.hostname === '127.0.0.1' && url.pathname === '/' && !url.search && !url.hash
+          : url.protocol === 'http:' && local;
+        if (!valid || url.username || url.password) throw Error(`${f.label}: usa una URL ${f.type === 'https-url' ? 'HTTPS sin credenciales' : 'HTTP de loopback sin credenciales'}.`);
+      }
       if (f.type === 'id' && !/^\d{17,20}$/.test(value)) throw Error(`${f.label}: usa un ID de Discord válido.`);
       if (f.type === 'ids' && !value.split(',').every(v => /^\d{17,20}$/.test(v.trim()))) throw Error('Roles de oficiales: IDs no válidos.');
       if (['hour', 'integer', 'positive', 'days'].includes(f.type) && (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) < (['positive', 'days'].includes(f.type) ? 1 : 0) || (f.type === 'hour' && Number(value) > 23) || (f.type === 'days' && Number(value) > 3660))) throw Error(`${f.label}: número fuera de rango.`);

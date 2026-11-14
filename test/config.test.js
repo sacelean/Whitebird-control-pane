@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parse } from 'dotenv';
-import { update, view, recruitmentModules } from '../config.js';
+import { update, view, recruitmentModules, agentModules, agentDiscordModules } from '../config.js';
 test('no devuelve credenciales y distingue su presencia', () => {
   const data = view('DISCORD_TOKEN=super-secret\nBLIZZARD_CLIENT_SECRET=hidden');
   assert.equal(data.secrets.DISCORD_TOKEN, true);
@@ -73,4 +73,28 @@ test('rechazo multilínea: repara backticks y conserva el mensaje corregido manu
   const saved = update(repaired, { APPLY_REJECTED_MESSAGE: changed }, recruitmentModules);
   assert.equal(parse(saved).APPLY_REJECTED_MESSAGE, changed);
   assert.equal((saved.match(/Lo hemos revisado/g) || []).length, 1);
+});
+
+test('IA: oculta secretos, separa adaptadores y valida contratos de conexión', () => {
+  const text = 'AGENT_API_TOKEN=private-agent-token-with-32-characters\nWOWAUDIT_OAUTH_CLIENT_SECRET=oauth-private\nOTHER=keep\n';
+  const data = view(text, agentModules);
+  assert.equal(data.secrets.AGENT_API_TOKEN, true);
+  assert.equal(data.secrets.WOWAUDIT_OAUTH_CLIENT_SECRET, true);
+  assert.ok(!JSON.stringify(data).includes('private-agent'));
+  assert.ok(!JSON.stringify(data).includes('oauth-private'));
+  assert.equal(data.values.DISCORD_BOT_TOKEN, undefined);
+  for (const changes of [
+    { AGENT_PORT: '65536' }, { AGENT_PORT: '1.5' }, { AGENT_API_TOKEN: 'short' },
+    { LLAMA_CHAT_URL: 'https://external.example/chat' },
+    { WOWAUDIT_MCP_URL: 'http://wowaudit.com/mcp' },
+    { WOWAUDIT_OAUTH_ISSUER: 'https://user:pass@example.com' },
+    { WOWAUDIT_OAUTH_REDIRECT_URL: 'http://external.example/callback' },
+    { DISCORD_BOT_TOKEN: 'wrong-file' }
+  ]) assert.throws(() => update(text, changes, agentModules));
+  const saved = update(text, { AGENT_PORT: '3091', LLAMA_CHAT_URL: 'http://127.0.0.1:8080/v1/chat/completions' }, agentModules);
+  assert.equal(parse(saved).OTHER, 'keep');
+  assert.equal(parse(saved).AGENT_API_TOKEN, parse(text).AGENT_API_TOKEN);
+  assert.equal(parse(saved).AGENT_PORT, '3091');
+  for (const changes of [{ DISCORD_AGENT_URL: 'http://example.com' }, { DISCORD_AGENT_URL: 'http://127.0.0.1:3090/ask' }, { DISCORD_CHANNEL_IDS: 'bad' }, { LLAMA_MODEL: 'wrong-file' }]) assert.throws(() => update('', changes, agentDiscordModules));
+  assert.equal(view('DISCORD_BOT_TOKEN=discord-private', agentDiscordModules).secrets.DISCORD_BOT_TOKEN, true);
 });
