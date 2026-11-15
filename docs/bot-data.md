@@ -97,3 +97,15 @@ No se suman alters ni se sustituyen los datos WoWAudit por documentación o SQLi
 
 Desplegar el panel antes del agente. No hay tokens nuevos ni migración de SQLite.
 Las pruebas usan vínculos ficticios e incluyen autenticación y aislamiento por servidor.
+
+## Conversaciones temporales del chat
+
+public/agent.js genera un UUID aleatorio por carga de página, sin localStorage ni
+historial persistido. Lo envía como conversationId a /api/agent. agent-api.js lo
+valida y añade el prefijo panel: al reenviar a /ask, junto al actor construido por
+el servidor. El agente separa esta conversación de Discord y de otras pestañas.
+Sin identificador válido no hay memoria compartida implícita. Caduca a los 15
+minutos y se borra al reiniciar el agente o al decir «olvida el contexto». Un cambio
+de proyecto limpia el contexto anterior. La memoria guarda consultas y filtros,
+no resultados ni secretos. Las acciones de Guardar/Aplicar mantienen sus controles
+y no se heredan de una conversación de lectura.

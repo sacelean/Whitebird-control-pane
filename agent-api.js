@@ -38,6 +38,7 @@ export function createAgentApi({ url = process.env.PANEL_AGENT_URL, token = proc
       catch (error) { return send(res, error.status || 502, { error: error.status ? error.message : 'No se pudo completar la acción.' }); }
     }
     if (!input || typeof input.question !== 'string' || !input.question.trim() || input.question.trim().length > 1000) return send(res, 400, { error: 'Escribe una pregunta de 1 a 1000 caracteres.' });
+    if (input.conversationId !== undefined && (typeof input.conversationId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(input.conversationId))) return send(res,400,{error:'Conversación no válida.'});
     if (diagnose && (!managementEnabled || !enabled) && isDiagnosticQuestion(input.question)) {
       try { return send(res, 200, await diagnose(input.question.trim(), input.project)); }
       catch { return send(res, 502, { error: 'No se pudo completar el diagnóstico. Revisa los permisos del panel.' }); }
@@ -47,7 +48,7 @@ export function createAgentApi({ url = process.env.PANEL_AGENT_URL, token = proc
       const response = await fetchFn(new URL('/ask', endpoint), {
         method: 'POST', redirect: 'error', signal: AbortSignal.timeout(300000),
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ question: input.question.trim(), ...(managementEnabled ? { actor: `panel:${csrf}` } : {}), ...(typeof input.project === 'string' && input.project ? { project: input.project } : {}) })
+        body: JSON.stringify({ question: input.question.trim(), ...(managementEnabled || input.conversationId ? { actor: `panel:${csrf}` } : {}), ...(input.conversationId?{conversationId:`panel:${input.conversationId}`}:{}), ...(typeof input.project === 'string' && input.project ? { project: input.project } : {}) })
       });
       if (response.status === 429) return send(res, 429, { error: 'El agente está ocupado. Vuelve a intentarlo cuando termine.' });
       if (!response.ok) throw new Error('Agent unavailable');
@@ -65,3 +66,4 @@ export function createAgentApi({ url = process.env.PANEL_AGENT_URL, token = proc
     }
   };
 }
+

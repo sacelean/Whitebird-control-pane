@@ -22,12 +22,13 @@ test('chat controls require save before apply, poll the job and render untrusted
     const state = { save: 'saved', apply: 'applying', status: 'applied' }[body.action];
     return { ok: true, json: async () => ({ proposal: { id, state, message: state, canApply: true } }) };
   };
-  const context = vm.createContext({ document: { getElementById: id => elements[id], createElement: tag => new Element(tag) }, fetch, setTimeout: callback => callback() });
+  const context = vm.createContext({ crypto:{randomUUID:()=> 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, document: { getElementById: id => elements[id], createElement: tag => new Element(tag) }, fetch, setTimeout: callback => callback() });
   vm.runInContext(await readFile(new URL('../public/agent.js', import.meta.url), 'utf8'), context);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(elements['agent-submit'].disabled, false);
   elements['agent-question'].value = 'Cambia el horario a las 5';
   await elements['agent-form'].listeners.submit({ preventDefault() {} });
+  assert.equal(calls[0].conversationId,'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
   const messages = elements['agent-messages'];
   assert.equal(messages.children[1].children[1].textContent, '<script>untrusted</script>');
   const save = messages.querySelectorAll('button').find(button => button.textContent === 'Guardar cambios');
@@ -41,3 +42,4 @@ test('chat controls require save before apply, poll the job and render untrusted
   assert.equal(elements['agent-status'].textContent, 'applied');
   assert.equal(elements['agent-submit'].disabled, false);
 });
+
