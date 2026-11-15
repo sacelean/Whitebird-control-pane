@@ -20,6 +20,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - run: node scripts/publish-knowledge.mjs --validate
+      - run: node --test scripts/check-knowledge.mjs
       - name: Empaquetar aplicación
         run: tar -czf panel.tar.gz package.json package-lock.json ./*.js public deploy
       - uses: actions/upload-artifact@v4
@@ -29,6 +31,8 @@ jobs:
           retention-days: 7
 
   deploy:
+    permissions:
+      contents: write
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: ci
     runs-on: ubuntu-latest
@@ -65,6 +69,17 @@ jobs:
           ssh "${ssh_opts[@]}" "$remote" "mkdir -p /opt/whitebird-control-panel/incoming/$release"
           scp -P "$OCI_SSH_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes panel.tar.gz "$remote:/opt/whitebird-control-panel/incoming/$release/panel.tar.gz"
           ssh "${ssh_opts[@]}" "$remote" "set -eu; cd /opt/whitebird-control-panel/incoming/$release; tar -xzf panel.tar.gz; bash deploy/release.sh '$release'"
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Publish verified documentation in this repository
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/publish-knowledge.mjs
       - name: Borrar clave local
         if: always()
         run: rm -f ~/.ssh/id_ed25519

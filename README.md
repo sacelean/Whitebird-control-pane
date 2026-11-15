@@ -181,3 +181,7 @@ Configura PANEL_AGENT_TOOLS_TOKEN y el secreto correspondiente en el servicio IA
 según docs/ai-agent.md. Los controles de guardar y aplicar usan las operaciones
 del panel. Los reinicios IA desde el chat requieren
 PANEL_SYSTEMD_RESTART_ENABLED y permisos sobre sus dos unidades systemd.
+
+## Documentación del chatbot
+
+Mantener [docs/knowledge.json](docs/knowledge.json) junto con cada cambio de comportamiento. La pipeline publica la versión verificada en este mismo repositorio y Whitebird-context la recoge con acceso de lectura. Ver [flujo y comprobaciones](docs/context-publication.md).
