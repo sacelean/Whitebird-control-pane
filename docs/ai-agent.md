@@ -146,3 +146,10 @@ componentes al conectar las herramientas. Los logs redactados se envían al
 modelo local para investigar. Pueden contener datos operativos y personales
 pertinentes al fallo. Las propuestas y el historial visible no son una auditoría
 persistente. Validar el modelo, Discord y los permisos de ejecución en la VM.
+
+## Consultas de registros
+
+El API autenticado /api/agent-tools ofrece recruitment_summary, recruitment_recent,
+wow_links, wow_sync_history, wow_cauldrons, wow_bis_summary y wow_promotions.
+Solo consultas SQLite predefinidas, filtradas por el servidor configurado, sin SQL
+libre, rutas ni servidor elegidos por el solicitante. Ver [contrato y alcance](bot-data.md).

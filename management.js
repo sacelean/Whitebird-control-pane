@@ -1,3 +1,4 @@
+import { botDataTools, readBotData } from './bot-data.js';
 import { readFile } from 'node:fs/promises';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { parse } from 'dotenv';
@@ -8,6 +9,7 @@ import { inspectDiscord } from './discord-permissions.js';
 const projectSchema = { type: 'string', enum: ['wow', 'recruitment', 'roulette', 'agent', 'agent-discord'] };
 const args = (properties, required = ['project']) => ({ type: 'object', properties: { project: projectSchema, ...properties }, required, additionalProperties: false });
 export const managementTools = [
+  ...botDataTools,
   { name: 'list_projects', description: 'Lista componentes disponibles para administrar.', inputSchema: args({}, []) },
   { name: 'read_config', description: 'Lee configuración y claves editables antes de preparar cambios. Usa keys para enfocar una vista parcial.', inputSchema: args({ keys: { type: 'array', maxItems: 20, items: { type: 'string' } } }) },
   { name: 'prepare_config', description: 'Prepara una propuesta validada de cambios de campos no secretos para revisión humana. No guarda ni reinicia. Usa claves y valores del esquema de read_config.', inputSchema: args({ changes: { type: 'object', additionalProperties: { type: 'string' } } }, ['project', 'changes']) },
@@ -74,6 +76,7 @@ export function createManagement({ projects, operations, execute, diagnose, toke
       catch { return { id: project.id, name: project.name, available: false }; }
     })) };
     const { project, text, env } = await load(input.project);
+    if (botDataTools.some(t => t.name === tool)) return sanitize(readBotData(tool, input, env, project, { now }), env, project.modules);
     if (tool === 'read_config') {
       if (input.keys !== undefined && (!Array.isArray(input.keys) || input.keys.length > 20 || !input.keys.every(key => typeof key === 'string' && project.modules.some(module => module.fields.some(field => field.key === key))))) throw operationError(400, 'Campos de configuración no válidos.');
       const visible = view(text, project.modules);
