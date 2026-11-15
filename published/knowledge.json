@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "repository": "sacelean/Whitebird-control-pane",
+  "revision": "e3344d6cfef8b48696c5f2486cc1cf1869ae3f9a",
+  "workflowRevision": "e3344d6cfef8b48696c5f2486cc1cf1869ae3f9a",
+  "runNumber": 21,
+  "runUrl": "https://github.com/sacelean/Whitebird-control-pane/actions/runs/43732972411",
+  "verifiedAt": "2026-11-15T16:00:50.438Z",
+  "verification": "pipeline",
+  "document": {
+    "schemaVersion": 1,
+    "id": "panel",
+    "reviewedAt": "2026-11-15",
+    "source": "Whitebird-control-pane, README.md, agent-api.js y docs/ai-agent.md",
+    "summary": "Administra la configuración de los bots, muestra datos persistidos y ofrece el chat compartido y diagnósticos locales.",
+    "overview": "Selecciona el componente para editar su configuración. El panel valida los campos, oculta secretos y guarda por componente. Los bots Docker pueden recrearse con Aplicar guardado y reiniciar si PANEL_RESTART_ENABLED está habilitado. Los componentes IA pueden reiniciarse desde el chat si se habilita esa opción y el usuario del panel tiene permisos sobre sus servicios systemd. El chat consulta al agente compartido y los diagnósticos se ejecutan en el backend del panel. Puedes preguntar por guardado, reinicios, configuración, diagnóstico o acceso.",
+    "topics": [
+      "Pide «diagnostica el panel» o «¿por qué Recruitment no arranca?» para revisar configuración guardada, conexiones, estado de servicios y patrones de error en logs. El diagnóstico local funciona con el agente desconectado. Devuelve comprobaciones y pasos de corrección. Los logs originales y valores secretos permanecen en el backend. Los permisos efectivos de Discord, vigencia OAuth y cambios pendientes de aplicar requieren comprobación adicional.",
+      "El panel lee los archivos indicados por sus rutas PANEL_* y valida los cambios antes de guardarlos con reemplazo atómico y control de revisión. Después de guardar, aplica los cambios con el reinicio del componente. Docker requiere PANEL_RESTART_ENABLED y acceso del usuario del panel a Compose. Para IA se usa el servicio systemd correspondiente. El panel escucha en loopback:3080 y se accede remotamente por túnel SSH. Los datos persistidos y el archivo guardado deben contrastarse con el estado del proceso en ejecución."
+    ]
+  }
+}
