@@ -193,3 +193,26 @@ test('IA: lista ambos archivos, guarda por separado y rechaza reinicio Docker', 
     assert.equal(unavailable.find(p => p.id === 'agent-discord').available, false);
   } finally { await new Promise(resolve => server.close(resolve)); await rm(dir, { recursive: true, force: true }); }
 });
+
+test('chat HTTP diagnoses the selected bot without AI and preserves secrets and CSRF', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'whitebird-chat-diagnostic-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const envPath = join(dir, 'wow.env');
+  await writeFile(envPath, 'DISCORD_TOKEN=private-diagnostic-token\nWOW_SYNC_HOUR=27\n');
+  const port = 19395;
+  const server = createPanel({ envPath, port, execute: async () => ({ stdout: '[]', stderr: '' }) });
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const url = `http://127.0.0.1:${port}/api/agent`;
+  const settings = await (await fetch(url)).json();
+  assert.equal(settings.enabled, true);
+  assert.equal(settings.diagnostics, true);
+  const request = csrf => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-panel-csrf': csrf }, body: JSON.stringify({ question: 'diagnostica', project: 'wow' }) });
+  assert.equal((await request('wrong')).status, 403);
+  const response = await request(settings.csrf);
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.equal(data.tool, 'panel_diagnostics');
+  assert.match(data.answer, /WOW_SYNC_HOUR no supera/);
+  assert.ok(!data.answer.includes('private-diagnostic-token'));
+});

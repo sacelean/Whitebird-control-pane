@@ -15,8 +15,8 @@ PANEL_AGENT_TOKEN=SECRETO_COMPARTIDO_CON_EL_AGENTE
 
 El token debe coincidir con AGENT_API_TOKEN y contener al menos 32 caracteres
 aleatorios. Mantener fuera del repositorio y con permisos restringidos. Si
-faltan variables, el formulario queda deshabilitado. Una URL distinta de un
-origen HTTP 127.0.0.1 impide arrancar el panel.
+faltan variables o la URL es inválida, las consultas WoWAudit quedan
+deshabilitadas y el diagnóstico local sigue disponible.
 
 Instalar y arrancar el servicio del agente en el mismo host antes de consultar.
 Ver [guía del agente](https://github.com/sacelean/whitebird-ai-agent/blob/main/docs/control-panel.md)
@@ -49,3 +49,41 @@ Si falta configuración, el chat explica qué variables debe configurar el
 administrador y permite comprobar de nuevo la conexión tras reiniciar el
 panel. La disponibilidad inicial indica configuración, no salud del agente.
 Este cambio de interfaz no instala ni configura el servicio de IA.
+
+
+## Diagnóstico desde el chat (2026-11-15)
+
+Pide «diagnostica el panel», «¿por qué Recruitment no arranca?», «revisa la
+configuración de ruleta» o «revisa los logs del agente». Si no mencionas un
+componente, se usa el seleccionado. «Panel» o «todos» comprueba los cinco.
+
+El backend del panel ejecuta el diagnóstico local aunque el agente o el modelo
+estén caídos. Reutiliza la validación de config.js para los valores guardados,
+comprueba campos requeridos, existencia de SQLite y almacén OAuth y compara
+puertos, URLs y tokens entre panel, agente y adaptador Discord. Compara el
+servidor y las rutas compartidas entre Recruitment y WoW Sync. Los montajes de
+Compose requieren contrastar las rutas efectivas en el host.
+
+Consulta únicamente comandos fijos de lectura. Para bots Docker usa compose ps
+--all y compose logs --tail 60. Para IA usa systemctl is-active y journalctl
+--lines 60 de whitebird-ai-agent o whitebird-ai-discord. Cada comando tiene un
+límite de cinco segundos y 128 KiB. Los fallos de permisos aparecen como falta
+de evidencia. Se permite un diagnóstico simultáneo por proceso del panel.
+
+Las comprobaciones HTTP usan /health del agente con el token del panel y
+/health del modelo, con timeout de tres segundos y sin redirecciones. Comprueban
+la respuesta del proceso. La sesión OAuth y la síntesis requieren una consulta
+real. El diagnóstico no inicia login OAuth ni consultas MCP.
+
+La respuesta contiene comprobaciones y pasos concretos. Los logs se clasifican
+por patrones conocidos de autenticación, permisos, conexión, archivos, puertos,
+OAuth y timeout. No se devuelven líneas, valores de configuración, rutas privadas
+ni excepciones. No se envían logs ni configuración al modelo. El texto se muestra
+con textContent. La ruta /api/agent conserva Host/Origin y CSRF y devuelve el
+contrato {tool, answer}, con tool=panel_diagnostics para estas consultas.
+
+El diagnóstico refleja archivos guardados y evidencia puntual. No determina si
+hay cambios pendientes de aplicar ni comprueba los permisos efectivos de Discord.
+Los logs pueden contener errores históricos. Las correcciones se realizan desde
+los formularios y procedimientos existentes. Ejecutar npm test y comprobar el
+chat en la instalación destino antes de dar por verificado el despliegue.

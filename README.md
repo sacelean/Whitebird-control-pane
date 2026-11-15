@@ -161,3 +161,13 @@ Campos contrastados el 2026-11-14 con `.env.example`, `src/server.js`,
 `src/agent.js`, `src/discord.js` y `deploy/whitebird-ai-agent.service` de la copia
 local del agente. El main remoto revisado aún no contiene los adaptadores;
 verifica la revisión instalada antes de aplicar o desplegar.
+
+
+## Investigar errores desde el asistente
+
+El chat admite «diagnostica el panel», «¿por qué Recruitment no arranca?» y
+«revisa los logs del agente». Comprueba configuración guardada, conexiones,
+estado de servicios y patrones de error en logs recientes. El diagnóstico local
+funciona también con el agente IA desconectado. Los resultados incluyen pasos
+para corregir los problemas y conservan ocultos los secretos y logs originales.
+Consulta [el alcance y los límites del diagnóstico](docs/ai-agent.md).

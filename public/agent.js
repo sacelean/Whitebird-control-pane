@@ -32,7 +32,7 @@ async function init() {
     const response = await fetch('/api/agent');
     if (!response.ok) throw Error();
     const data = await response.json(); csrf = data.csrf; enabled = data.enabled === true;
-    status.textContent = enabled ? 'Listo para consultar WoWAudit. Las consultas pueden tardar varios minutos.' : 'El chat está disponible, pero falta conectar el servicio de IA. Configura PANEL_AGENT_URL y PANEL_AGENT_TOKEN en el servidor del panel y reinícialo.';
+    status.textContent = enabled ? (data.wowaudit ? 'Puedes pedir un diagnóstico del panel o consultar WoWAudit.' : 'Diagnóstico local disponible. Para consultar WoWAudit, configura la conexión del agente.') : 'El chat está disponible, pero falta conectar el servicio de IA. Configura PANEL_AGENT_URL y PANEL_AGENT_TOKEN en el servidor del panel y reinícialo.';
   } catch { status.textContent = 'No se pudo comprobar la conexión del agente. Vuelve a comprobarla.'; }
   submit.disabled = !enabled; question.disabled = !enabled; retry.hidden = enabled;
 }
@@ -43,17 +43,17 @@ form.addEventListener('submit', async event => {
   if (busy || !enabled || !prompt) return;
   busy = true; submit.disabled = true; question.disabled = true;
   addMessage('Tú', prompt);
-  status.textContent = 'Consultando WoWAudit…';
+  status.textContent = 'Comprobando la consulta…';
   try {
     const response = await fetch('/api/agent', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Panel-CSRF': csrf },
-      body: JSON.stringify({ question: prompt })
+      body: JSON.stringify({ question: prompt, project: document.getElementById('project').value })
     });
     const data = await response.json();
     if (!response.ok) {
       const error = data.error || 'No se pudo completar la consulta.';
       addMessage('Asistente', error); status.textContent = error;
-      if (response.status === 503 || response.status === 403) { enabled = false; retry.hidden = false; }
+      if (response.status === 403) { enabled = false; retry.hidden = false; }
       return;
     }
     addMessage('Asistente', data.answer); question.value = '';

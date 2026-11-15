@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { createDiagnostics } from './diagnostics.js';
 import { createAgentApi } from './agent-api.js';
 import { recruitmentRecords } from './recruitment-records.js';
 import { readAudit } from './audit.js';
@@ -19,7 +20,6 @@ const botsRoot = resolve(here, '..');
 export function createPanel({ agentEnvPath = resolve(process.env.PANEL_AGENT_ENV_PATH || join(botsRoot, 'whitebird-ai-agent/.env')), agentDiscordEnvPath = resolve(process.env.PANEL_AGENT_DISCORD_ENV_PATH || join(botsRoot, 'whitebird-ai-agent/discord.env')), restartEnabled = process.env.PANEL_RESTART_ENABLED === 'true', execute = runCompose, envPath = resolve(process.env.PANEL_ENV_PATH || join(botsRoot, 'whitebird-wow-role-sync/.env')), port = Number(process.env.PANEL_PORT || 3080), recruitmentEnvPath = resolve(process.env.PANEL_RECRUITMENT_ENV_PATH || join(botsRoot, 'whitebird-recruitment-bot/.env')), rouletteEnvPath = resolve(process.env.PANEL_ROULETTE_ENV_PATH || join(botsRoot, 'whitebird-wow-wheel/.env')) } = {}) {
 const origin = `http://127.0.0.1:${port}`;
 const csrf = randomBytes(32).toString('hex');
-const agentApi = createAgentApi();
 let saving = false;
 const projects = [
   { id: 'wow', name: 'WoW Role Sync', path: envPath, modules, base: dirname(envPath) },
@@ -28,6 +28,8 @@ const projects = [
   { id: 'agent', name: 'Whitebird IA · Servicio', path: agentEnvPath, modules: agentModules, base: dirname(agentEnvPath), manualRestart: true },
   { id: 'agent-discord', name: 'Whitebird IA · Bot Discord', path: agentDiscordEnvPath, modules: agentDiscordModules, base: dirname(agentDiscordEnvPath), manualRestart: true }
 ];
+const diagnose = createDiagnostics({ projects, execute });
+const agentApi = createAgentApi({ diagnose });
 const readEnv = project => readFile(project.path, 'utf8');
 async function state(env, project) {
   if (project.manualRestart) return { available: false, message: 'Este componente no utiliza SQLite. El panel no comprueba el proceso, el modelo ni la sesión OAuth en vivo.' };
