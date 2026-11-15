@@ -7,6 +7,8 @@ const dialog = document.getElementById('agent-dialog');
 const launcher = document.getElementById('agent-open');
 const retry = document.getElementById('agent-retry');
 let csrf, busy = false, enabled = false;
+// A new page gets a separate ephemeral conversation; no transcript is persisted.
+const conversationId=globalThis.crypto?.randomUUID?.();
 launcher.addEventListener('click', () => {
   dialog.showModal();
   if (enabled && !busy) question.focus();
@@ -95,7 +97,7 @@ form.addEventListener('submit', async event => {
   try {
     const response = await fetch('/api/agent', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Panel-CSRF': csrf },
-      body: JSON.stringify({ question: prompt, project: document.getElementById('project').value })
+      body: JSON.stringify({ question: prompt, ...(conversationId?{conversationId}:{}), project: document.getElementById('project').value })
     });
     const data = await response.json();
     if (!response.ok) {
@@ -117,3 +119,4 @@ form.addEventListener('submit', async event => {
   }
 });
 init();
+

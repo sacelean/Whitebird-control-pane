@@ -87,3 +87,38 @@ test('HTTP tool API authenticates, rejects caller SQL/guild/path overrides, and 
   const tools=await(await fetch(url,{headers:{Authorization:`Bearer ${token}`}})).json();assert.ok(tools.tools.some(x=>x.name==='wow_sync_history'));
  }finally{await new Promise(r=>server.close(r));}
 });
+
+
+test('Discord resolution is exact, guild-scoped, read-only and returns only character/realm',async t=>{
+ const f=await fixture(t),db=new Database(f.file),user='123456789012345678';
+ db.exec('ALTER TABLE wow_links ADD COLUMN user_id TEXT');
+ db.prepare('UPDATE wow_links SET user_id=?').run(user);
+ db.prepare('INSERT INTO wow_links VALUES (?,?,?,?,?)').run('guild-a','Other','another','channel','223456789012345678');
+ db.close();const project={id:'wow',base:f.base},before=await readFile(f.file);
+ const read=args=>readBotData('wow_resolve_user',{project:'wow',...args},f.env,project);
+ assert.deepEqual(read({userId:user}),{available:true,guildId:'guild-a',status:'resolved',character:'Alpha',realm:'realm'});
+ assert.equal(read({userId:'323456789012345678'}).status,'not_found');
+ for(const args of [{},{userId:'bad'},{userId:user,guildId:'guild-b'},{userId:user,sql:'DROP TABLE wow_links'}])assert.throws(()=>read(args));
+ assert.deepEqual(await readFile(f.file),before);
+ const more=new Database(f.file);more.prepare('INSERT INTO wow_links VALUES (?,?,?,?,?)').run('guild-a','Duplicate','realm',null,user);more.close();
+ assert.equal(read({userId:user}).status,'ambiguous');
+ const path=join(f.base,'bot.env');await writeFile(path,'DISCORD_GUILD_ID=guild-a\nDATABASE_PATH=records.sqlite\n');
+ const m=createManagement({projects:[{...project,path,modules}],token:'x'.repeat(32)});
+ await assert.rejects(m.call('wow_resolve_user',{project:'wow',userId:user},'discord:guild-b:someone'),{status:403});
+});
+
+test('linked realm filters do not include same-name records from another realm',async t=>{
+ const f=await fixture(t),db=new Database(f.file);
+ db.prepare('INSERT INTO recruitment_decisions VALUES (?,?,?,?,?,?,?)').run('guild-a','other','Alpha','different','aceptada','completed','2026-11-01 02:00:00');db.close();
+ assert.equal(readBotData('recruitment_summary',{project:'recruitment',character:'Alpha',realm:'realm'},f.env,f.project).total,1);
+});
+
+test('resolver HTTP requires authentication and rejects cross-guild Discord actors',async t=>{
+ const f=await fixture(t),db=new Database(f.file),user='123456789012345678';db.exec('ALTER TABLE wow_links ADD COLUMN user_id TEXT');db.prepare('UPDATE wow_links SET user_id=?').run(user);db.close();
+ const path=join(f.base,'wow.env');await writeFile(path,'DISCORD_GUILD_ID=guild-a\nDATABASE_PATH=records.sqlite\n');
+ const {default:http}=await import('node:http');const probe=http.createServer();await new Promise(r=>probe.listen(0,'127.0.0.1',r));const port=probe.address().port;await new Promise(r=>probe.close(r));
+ const {createPanel}=await import('../server.js');const token='x'.repeat(32),server=createPanel({envPath:path,toolsToken:token,port});await new Promise(r=>server.listen(port,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
+ const request=(actor,auth=true)=>fetch(`http://127.0.0.1:${port}/api/agent-tools`,{method:'POST',headers:{'Content-Type':'application/json',...(auth?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify({tool:'wow_resolve_user',arguments:{project:'wow',userId:user},actor})});
+ assert.equal((await request('api',false)).status,401);assert.equal((await request('discord:guild-b:someone')).status,403);
+ const result=await request('api');assert.equal(result.status,200);const data=await result.json();assert.equal(data.character,'Alpha');assert.equal(data.realm,'realm');assert.equal(data.userId,undefined);
+});

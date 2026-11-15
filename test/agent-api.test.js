@@ -73,3 +73,15 @@ test('local diagnostics remain available when the shared administration agent is
   assert.equal(result.data.tool, 'panel_diagnostics');
   assert.match(result.data.answer, /agente no estuvo disponible/);
 });
+
+
+test('panel session is validated and forwarded separately from authenticated actor',async()=>{
+ const conversationId='aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';let calls=0;
+ const api=createAgentApi({url:'http://127.0.0.1:3090',token,fetchFn:async(_url,options)=>{
+  calls++;const data=JSON.parse(options.body);assert.equal(data.actor,'panel:csrf');assert.equal(data.conversationId,'panel:'+conversationId);
+  return {ok:true,json:async()=>({tool:null,answer:'Respuesta'})};
+ }});
+ assert.equal((await request(api,{question:'quien ha looteado mas',conversationId,actor:'other'})).status,200);
+ for(const value of ['other',{},'x'.repeat(1000)])assert.equal((await request(api,{question:'y el que menos',conversationId:value})).status,400);
+ assert.equal(calls,1);
+});

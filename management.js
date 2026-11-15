@@ -76,6 +76,7 @@ export function createManagement({ projects, operations, execute, diagnose, toke
       catch { return { id: project.id, name: project.name, available: false }; }
     })) };
     const { project, text, env } = await load(input.project);
+    if (tool === 'wow_resolve_user' && typeof actor === 'string' && actor.startsWith('discord:') && actor.split(':')[1] !== env.DISCORD_GUILD_ID) throw operationError(403, 'Servidor de Discord no permitido.');
     if (botDataTools.some(t => t.name === tool)) return sanitize(readBotData(tool, input, env, project, { now }), env, project.modules);
     if (tool === 'read_config') {
       if (input.keys !== undefined && (!Array.isArray(input.keys) || input.keys.length > 20 || !input.keys.every(key => typeof key === 'string' && project.modules.some(module => module.fields.some(field => field.key === key))))) throw operationError(400, 'Campos de configuración no válidos.');
@@ -183,3 +184,4 @@ export function createManagement({ projects, operations, execute, diagnose, toke
   }
   return { enabled, call, act, api };
 }
+

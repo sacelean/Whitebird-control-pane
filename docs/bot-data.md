@@ -78,3 +78,34 @@ sobre Blizzard, Discord o WoWAudit. La ayuda documental sigue el flujo del conte
 
 Pruebas usan SQLite temporal y servidores HTTP locales, con el recorrido Discord
 → agente → cliente autenticado del panel. No se consulta producción en esta tarea.
+
+
+## Resolución de menciones Discord
+
+wow_resolve_user recibe project=wow y userId (17–20 dígitos) y consulta wow_links
+por guild_id configurado + user_id exactos. Devuelve available, guildId y status
+(resolved/not_found/ambiguous/invalid); solo si hay un vínculo único válido incluye
+character y realm. No devuelve userId ni listas de identidades. Missing DB/tabla
+es no disponible, nunca «sin vínculo». Solo lectura y SQL parametrizado.
+Los actores discord:servidor:usuario de otro servidor se rechazan con 403.
+
+recruitment_summary/recent, wow_links, wow_sync_history y wow_promotions admiten
+realm opcional. Con realm, character compara el nombre exacto, sin coincidencias
+parciales; realm compara el reino exacto sin distinguir mayúsculas. El agente usa
+ambos campos para las menciones y luego consulta los datos de WoWAudit por MCP.
+No se suman alters ni se sustituyen los datos WoWAudit por documentación o SQLite.
+
+Desplegar el panel antes del agente. No hay tokens nuevos ni migración de SQLite.
+Las pruebas usan vínculos ficticios e incluyen autenticación y aislamiento por servidor.
+
+## Conversaciones temporales del chat
+
+public/agent.js genera un UUID aleatorio por carga de página, sin localStorage ni
+historial persistido. Lo envía como conversationId a /api/agent. agent-api.js lo
+valida y añade el prefijo panel: al reenviar a /ask, junto al actor construido por
+el servidor. El agente separa esta conversación de Discord y de otras pestañas.
+Sin identificador válido no hay memoria compartida implícita. Caduca a los 15
+minutos y se borra al reiniciar el agente o al decir «olvida el contexto». Un cambio
+de proyecto limpia el contexto anterior. La memoria guarda consultas y filtros,
+no resultados ni secretos. Las acciones de Guardar/Aplicar mantienen sus controles
+y no se heredan de una conversación de lectura.
