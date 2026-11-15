@@ -171,3 +171,13 @@ estado de servicios y patrones de error en logs recientes. El diagnóstico local
 funciona también con el agente IA desconectado. Los resultados incluyen pasos
 para corregir los problemas y conservan ocultos los secretos y logs originales.
 Consulta [el alcance y los límites del diagnóstico](docs/ai-agent.md).
+
+
+## Cambios y diagnóstico desde la IA
+
+El agente puede consultar configuración real, investigar estado/logs y permisos
+de Discord y preparar cambios para revisar en el chat del panel o Discord.
+Configura PANEL_AGENT_TOOLS_TOKEN y el secreto correspondiente en el servicio IA
+según docs/ai-agent.md. Los controles de guardar y aplicar usan las operaciones
+del panel. Los reinicios IA desde el chat requieren
+PANEL_SYSTEMD_RESTART_ENABLED y permisos sobre sus dos unidades systemd.

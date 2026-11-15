@@ -26,6 +26,7 @@ export const rouletteModules = [
 ];
 export const agentModules = [
   { id: 'agent-api', name: 'Servicio de IA', description: 'API local compartida por el chat del panel y Discord. El token debe coincidir con PANEL_AGENT_TOKEN y con el adaptador Discord.', fields: [field('AGENT_PORT', 'Puerto local del agente', 'port', '3090'), field('AGENT_API_TOKEN', 'Token compartido del agente', 'secret')] },
+  { id: 'administration', name: 'Herramientas del control pane', description: 'Conexión del agente con la API local de administración del panel. El token coincide con PANEL_AGENT_TOOLS_TOKEN en el entorno del panel.', fields: [field('PANEL_TOOLS_URL', 'URL local del panel', 'agent-url', 'http://127.0.0.1:3080'), field('PANEL_TOOLS_TOKEN', 'Token de las herramientas del panel', 'secret')] },
   { id: 'model', name: 'Modelo local', description: 'Conexión con llama-server. Cambiar estos campos no instala ni descarga modelos.', fields: [field('LLAMA_CHAT_URL', 'URL de chat del modelo', 'model-url', 'http://127.0.0.1:8080/v1/chat/completions'), field('LLAMA_MODEL', 'Nombre del modelo', 'text', 'local')] },
   { id: 'mcp', name: 'WoWAudit MCP y OAuth', description: 'Consultas de solo lectura. El login OAuth se realiza fuera del panel; aquí no se lee ni modifica el archivo de sesión.', fields: [field('WOWAUDIT_MCP_URL', 'Endpoint MCP', 'https-url', 'https://wowaudit.com/mcp'), field('WOWAUDIT_TEAM_ID', 'ID del equipo', 'positive', '66082'), field('WOWAUDIT_OAUTH_STORE', 'Ruta del almacén OAuth'), field('WOWAUDIT_OAUTH_REDIRECT_URL', 'URL de callback OAuth', 'callback-url', 'http://127.0.0.1:8787/callback'), field('WOWAUDIT_OAUTH_CLIENT_ID', 'Client ID OAuth (opcional)'), field('WOWAUDIT_OAUTH_ISSUER', 'Issuer OAuth (opcional)', 'https-url'), field('WOWAUDIT_OAUTH_CLIENT_SECRET', 'Client Secret OAuth (opcional)', 'secret')] }
 ];
@@ -59,7 +60,7 @@ export function update(text, changes, selectedModules = modules) {
     const f = fields.find(f => f.key === key);
     if (!f || typeof value !== 'string' || value.length > 8000 || (f.type === 'message' ? /[\r\0]/ : /[\r\n\0]/).test(value)) throw Error(`Valor no válido: ${key}`);
     if (value) {
-      if (f.key === 'AGENT_API_TOKEN' && value.length < 32) throw Error('El token del agente requiere al menos 32 caracteres.');
+      if (['AGENT_API_TOKEN', 'PANEL_TOOLS_TOKEN'].includes(f.key) && value.length < 32) throw Error('El token del agente requiere al menos 32 caracteres.');
       if (f.type === 'port' && (!/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 65535)) throw Error(`${f.label}: usa un puerto de 1 a 65535.`);
       if (['model-url', 'agent-url', 'https-url', 'callback-url'].includes(f.type)) {
         let url;

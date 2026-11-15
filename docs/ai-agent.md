@@ -102,3 +102,47 @@ local. La ayuda usa resúmenes documentados en whitebird-ai-agent y requiere una
 revisión del agente con project-help.js y project-knowledge.js. Responde con
 {tool: null, answer}. Para cuestiones de funcionamiento en Discord, indica el
 nombre del bot o un comando. La ayuda no consulta la configuración efectiva.
+
+
+## Administración asistida (2026-11-15)
+
+Configura PANEL_AGENT_TOOLS_TOKEN en el entorno del panel. En el agente,
+PANEL_TOOLS_URL apunta al origen HTTP loopback del panel y PANEL_TOOLS_TOKEN
+contiene el mismo secreto de al menos 32 caracteres. Se mantiene separado del
+token del proxy /ask. La ruta /api/agent-tools exige Bearer, Host loopback y
+ausencia de Origin. Las confirmaciones del navegador conservan CSRF.
+
+El agente dispone de herramientas para configuración real, estado, logs
+redactados, diagnóstico y permisos efectivos del bot en Discord. Las lecturas
+identifican valores guardados y predeterminados. La comprobación Discord usa
+consultas GET con el token del propio componente. Evalúa servidor, overwrites
+de canales, existencia de roles y jerarquía mediante BigInt. Limita la vista a
+20 canales configurados y 100 roles e indica vistas parciales. Hilos y permisos
+particulares de comandos requieren revisión específica. Algoritmo de referencia:
+https://docs.discord.com/developers/topics/permissions
+
+El modelo prepara cambios sobre campos del esquema. Los secretos se editan en
+el formulario. La propuesta muestra valores anteriores y nuevos y ofrece Guardar,
+Aplicar y reiniciar, Estado y cierre/cancelación según su fase. Las propuestas
+se vinculan a la instancia del panel mediante su CSRF o al usuario/servidor de Discord y caducan
+a los 15 minutos. Son efímeras y se invalidan al reiniciar el panel.
+
+operations.js comparte la validación, guardado atómico y exclusión mutua entre
+formularios y chat. Cada guardado compara revisión. La aplicación compara la
+revisión guardada y conserva un resultado consultable. Las confirmaciones
+repetidas devuelven el estado registrado. Un reinicio incierto se marca como
+fallido y requiere comprobar estado/logs y preparar una nueva solicitud.
+
+PANEL_RESTART_ENABLED conserva su efecto para Compose. Para IA,
+PANEL_SYSTEMD_RESTART_ENABLED=true habilita systemctl restart de las unidades
+fijas whitebird-ai-agent y whitebird-ai-discord. El usuario del panel debe tener
+esos permisos mediante la configuración del sistema. Los trabajos empiezan de
+forma diferida para permitir responder antes de reiniciar el agente/adaptador.
+El panel consulta su estado y Discord ofrece el botón Estado. El proceso del
+panel conserva el resultado durante los reinicios de los componentes IA.
+
+Los usuarios que ya tengan acceso al agente en Discord podrán administrar los
+componentes al conectar las herramientas. Los logs redactados se envían al
+modelo local para investigar. Pueden contener datos operativos y personales
+pertinentes al fallo. Las propuestas y el historial visible no son una auditoría
+persistente. Validar el modelo, Discord y los permisos de ejecución en la VM.

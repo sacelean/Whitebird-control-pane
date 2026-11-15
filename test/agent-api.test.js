@@ -62,3 +62,14 @@ test('explanations reach the shared agent with selected project while errors sta
   assert.equal(forwarded, 3);
   assert.equal(diagnosed, 3);
 });
+
+test('local diagnostics remain available when the shared administration agent is offline', async () => {
+  const api = createAgentApi({ url: 'http://127.0.0.1:3090', token, managementEnabled: true,
+    diagnose: async () => ({ tool: 'panel_diagnostics', answer: 'Comprobado localmente' }),
+    fetchFn: async () => { throw Error('offline'); }
+  });
+  const result = await request(api, { question: 'Recruitment no funciona', project: 'recruitment' });
+  assert.equal(result.status, 200);
+  assert.equal(result.data.tool, 'panel_diagnostics');
+  assert.match(result.data.answer, /agente no estuvo disponible/);
+});

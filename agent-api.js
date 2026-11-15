@@ -1,12 +1,12 @@
 export function isDiagnosticQuestion(question) {
   const text = question.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
-  if (/diagnost|misconfig|missconfig|no (?:arranca|funciona|conecta|responde)|\blogs?\b|\berrores?\b|\bfalla\b|\bfallos?\b/.test(text)) return true;
+  if (/diagnost|misconfig|missconfig|no (?:arranca|funciona|conecta|responde)|\blogs?\b|\berror(?:es)?\b|\bfalla\b|\bfallos?\b/.test(text)) return true;
   if (/como|explica|que (?:hace|es|significa|permisos|comandos)|para que|funciona|ayuda/.test(text)) return false;
   return /configura|\bpermisos?\b|\bpuertos?\b|\btokens?\b|estado.*(?:bot|servicio|panel|agente)/.test(text);
 }
 
 // Installed in the root of Whitebird-control-pane. Token stays on the server.
-export function createAgentApi({ url = process.env.PANEL_AGENT_URL, token = process.env.PANEL_AGENT_TOKEN, fetchFn = fetch, diagnose } = {}) {
+export function createAgentApi({ url = process.env.PANEL_AGENT_URL, token = process.env.PANEL_AGENT_TOKEN, fetchFn = fetch, diagnose, managementEnabled = false, act } = {}) {
   let endpoint;
   if (url) {
     try {
@@ -33,8 +33,12 @@ export function createAgentApi({ url = process.env.PANEL_AGENT_URL, token = proc
       }
       input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
     } catch { return send(res, 400, { error: 'JSON no válido.' }); }
+    if (input?.action && act) {
+      try { return send(res, 200, await act(input.action, input.id, `panel:${csrf}`)); }
+      catch (error) { return send(res, error.status || 502, { error: error.status ? error.message : 'No se pudo completar la acción.' }); }
+    }
     if (!input || typeof input.question !== 'string' || !input.question.trim() || input.question.trim().length > 1000) return send(res, 400, { error: 'Escribe una pregunta de 1 a 1000 caracteres.' });
-    if (diagnose && isDiagnosticQuestion(input.question)) {
+    if (diagnose && (!managementEnabled || !enabled) && isDiagnosticQuestion(input.question)) {
       try { return send(res, 200, await diagnose(input.question.trim(), input.project)); }
       catch { return send(res, 502, { error: 'No se pudo completar el diagnóstico. Revisa los permisos del panel.' }); }
     }
@@ -43,13 +47,21 @@ export function createAgentApi({ url = process.env.PANEL_AGENT_URL, token = proc
       const response = await fetchFn(new URL('/ask', endpoint), {
         method: 'POST', redirect: 'error', signal: AbortSignal.timeout(300000),
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ question: input.question.trim(), ...(typeof input.project === 'string' && input.project ? { project: input.project } : {}) })
+        body: JSON.stringify({ question: input.question.trim(), ...(managementEnabled ? { actor: `panel:${csrf}` } : {}), ...(typeof input.project === 'string' && input.project ? { project: input.project } : {}) })
       });
       if (response.status === 429) return send(res, 429, { error: 'El agente está ocupado. Vuelve a intentarlo cuando termine.' });
       if (!response.ok) throw new Error('Agent unavailable');
       const data = await response.json();
       if (typeof data.answer !== 'string' || !(data.tool === null || typeof data.tool === 'string')) throw new Error('Invalid response');
-      return send(res, 200, { answer: data.answer, tool: data.tool });
-    } catch { return send(res, 502, { error: 'No se pudo consultar al agente. Comprueba el servicio, el modelo y la autorización de WoWAudit.' }); }
+      return send(res, 200, { answer: data.answer, tool: data.tool, ...(data.proposal ? { proposal: data.proposal } : {}) });
+    } catch {
+      if (diagnose && isDiagnosticQuestion(input.question)) {
+        try {
+          const result = await diagnose(input.question.trim(), input.project);
+          return send(res, 200, { ...result, answer: `${result.answer}\n\nEl agente no estuvo disponible. Se muestran las comprobaciones locales del panel.` });
+        } catch {}
+      }
+      return send(res, 502, { error: 'No se pudo consultar al agente. Comprueba el servicio, el modelo y la autorización de WoWAudit.' });
+    }
   };
 }

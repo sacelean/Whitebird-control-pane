@@ -216,3 +216,27 @@ test('chat HTTP diagnoses the selected bot without AI and preserves secrets and 
   assert.match(data.answer, /WOW_SYNC_HOUR no supera/);
   assert.ok(!data.answer.includes('private-diagnostic-token'));
 });
+
+test('agent tool HTTP route requires backend authentication and action confirmations require browser CSRF', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'whitebird-tool-http-'));
+  const envPath = join(dir, '.env');
+  await writeFile(envPath, 'DISCORD_TOKEN=hidden-token\nWOW_SYNC_HOUR=4\n');
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const port = 19396, toolsToken = 'tool-http-token-'.repeat(3);
+  const server = createPanel({ port, envPath, toolsToken, execute: async () => ({ stdout: '[]' }) });
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const base = `http://127.0.0.1:${port}`;
+  assert.equal((await fetch(`${base}/api/agent-tools`)).status, 401);
+  assert.equal((await fetch(`${base}/api/agent-tools`, { headers: { Authorization: `Bearer ${toolsToken}`, Origin: base } })).status, 401);
+  const settings = await (await fetch(`${base}/api/agent`)).json();
+  const response = await fetch(`${base}/api/agent-tools`, { method: 'POST', headers: { Authorization: `Bearer ${toolsToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tool: 'prepare_config', arguments: { project: 'wow', changes: { WOW_SYNC_HOUR: '5' } }, actor: `panel:${settings.csrf}` }) });
+  const prepared = await response.json();
+  assert.equal(response.status, 200);
+  const action = csrf => fetch(`${base}/api/agent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Panel-CSRF': csrf }, body: JSON.stringify({ action: 'save', id: prepared.proposal.id }) });
+  assert.equal((await action('wrong')).status, 403);
+  assert.match(await readFile(envPath, 'utf8'), /WOW_SYNC_HOUR=4/);
+  assert.equal((await action(settings.csrf)).status, 200);
+  assert.match(await readFile(envPath, 'utf8'), /WOW_SYNC_HOUR=5/);
+});

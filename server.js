@@ -1,3 +1,5 @@
+import { createManagement } from './management.js';
+import { createOperations } from './operations.js';
 import 'dotenv/config';
 import { createDiagnostics } from './diagnostics.js';
 import { createAgentApi } from './agent-api.js';
@@ -8,19 +10,19 @@ import http from 'node:http';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 const runCompose = promisify(execFile);
-import { readFile, writeFile, rename, unlink, access } from 'node:fs/promises';
+import { readFile, access } from 'node:fs/promises';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { parse } from 'dotenv';
-import { view, update, revision, modules, recruitmentModules, rouletteModules, agentModules, agentDiscordModules } from './config.js';
+import { view, modules, recruitmentModules, rouletteModules, agentModules, agentDiscordModules } from './config.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const botsRoot = resolve(here, '..');
-export function createPanel({ agentEnvPath = resolve(process.env.PANEL_AGENT_ENV_PATH || join(botsRoot, 'whitebird-ai-agent/.env')), agentDiscordEnvPath = resolve(process.env.PANEL_AGENT_DISCORD_ENV_PATH || join(botsRoot, 'whitebird-ai-agent/discord.env')), restartEnabled = process.env.PANEL_RESTART_ENABLED === 'true', execute = runCompose, envPath = resolve(process.env.PANEL_ENV_PATH || join(botsRoot, 'whitebird-wow-role-sync/.env')), port = Number(process.env.PANEL_PORT || 3080), recruitmentEnvPath = resolve(process.env.PANEL_RECRUITMENT_ENV_PATH || join(botsRoot, 'whitebird-recruitment-bot/.env')), rouletteEnvPath = resolve(process.env.PANEL_ROULETTE_ENV_PATH || join(botsRoot, 'whitebird-wow-wheel/.env')) } = {}) {
+export function createPanel({ toolsToken = process.env.PANEL_AGENT_TOOLS_TOKEN, systemdRestartEnabled = process.env.PANEL_SYSTEMD_RESTART_ENABLED === 'true', agentEnvPath = resolve(process.env.PANEL_AGENT_ENV_PATH || join(botsRoot, 'whitebird-ai-agent/.env')), agentDiscordEnvPath = resolve(process.env.PANEL_AGENT_DISCORD_ENV_PATH || join(botsRoot, 'whitebird-ai-agent/discord.env')), restartEnabled = process.env.PANEL_RESTART_ENABLED === 'true', execute = runCompose, envPath = resolve(process.env.PANEL_ENV_PATH || join(botsRoot, 'whitebird-wow-role-sync/.env')), port = Number(process.env.PANEL_PORT || 3080), recruitmentEnvPath = resolve(process.env.PANEL_RECRUITMENT_ENV_PATH || join(botsRoot, 'whitebird-recruitment-bot/.env')), rouletteEnvPath = resolve(process.env.PANEL_ROULETTE_ENV_PATH || join(botsRoot, 'whitebird-wow-wheel/.env')) } = {}) {
 const origin = `http://127.0.0.1:${port}`;
 const csrf = randomBytes(32).toString('hex');
-let saving = false;
+const operations = createOperations({ execute, restartEnabled, systemdRestartEnabled });
 const projects = [
   { id: 'wow', name: 'WoW Role Sync', path: envPath, modules, base: dirname(envPath) },
   { id: 'recruitment', name: 'Recruitment', path: recruitmentEnvPath, modules: recruitmentModules, base: dirname(recruitmentEnvPath) },
@@ -29,7 +31,8 @@ const projects = [
   { id: 'agent-discord', name: 'Whitebird IA · Bot Discord', path: agentDiscordEnvPath, modules: agentDiscordModules, base: dirname(agentDiscordEnvPath), manualRestart: true }
 ];
 const diagnose = createDiagnostics({ projects, execute });
-const agentApi = createAgentApi({ diagnose });
+const management = createManagement({ projects, operations, execute, diagnose, token: toolsToken, restartEnabled, systemdRestartEnabled });
+const agentApi = createAgentApi({ diagnose, managementEnabled: management.enabled, act: management.act });
 const readEnv = project => readFile(project.path, 'utf8');
 async function state(env, project) {
   if (project.manualRestart) return { available: false, message: 'Este componente no utiliza SQLite. El panel no comprueba el proceso, el modelo ni la sesión OAuth en vivo.' };
@@ -55,6 +58,7 @@ const server = http.createServer(async (req, res) => {
   if (req.headers.host !== `127.0.0.1:${port}` || (req.headers.origin && req.headers.origin !== origin)) return send(res, 403, { error: 'Origen no permitido.' });
   try {
     const url = new URL(req.url, origin);
+    if (url.pathname === '/api/agent-tools') return await management.api(req, res, send);
     if (url.pathname === '/api/agent') return await agentApi(req, res, { csrf, send });
     if (url.pathname === '/api/projects' && req.method === 'GET') {
       const list = await Promise.all(projects.map(async p => {
@@ -80,27 +84,8 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/restart' && req.method === 'POST') {
       if (req.headers['x-panel-csrf'] !== csrf) return send(res, 403, { error: 'Recarga el panel para reiniciar.' });
       if (!project) return send(res, 404, { error: 'Bot desconocido.' });
-      if (project.manualRestart) return send(res, 403, { error: 'Este componente usa systemd. Reinicia su servicio manualmente después de guardar.' });
-      if (!restartEnabled) return send(res, 403, { error: 'Reinicio deshabilitado. Configura PANEL_RESTART_ENABLED=true en el servidor.' });
-      if (saving) return send(res, 409, { error: 'Hay otro guardado o reinicio en curso.' });
-      saving = true;
-      try {
-        const current = await readEnv(project);
-        if (req.headers['x-panel-revision'] !== revision(current)) return send(res, 409, { error: 'La configuración ha cambiado. Recarga antes de reiniciar.' });
-        const service = project.id === 'roulette' ? 'whitebird-wow-wheel' : 'bot';
-        try {
-          await execute('docker', ['compose', 'up', '-d', '--no-deps', '--force-recreate', service], {
-            cwd: project.base, timeout: 120000, maxBuffer: 1024 * 1024,
-            // La configuración de Compose debe venir del .env del bot, no del panel.
-            env: Object.fromEntries(Object.entries(process.env).filter(([key]) =>
-              ['PATH', 'HOME', 'USER', 'LOGNAME', 'LANG', 'DOCKER_HOST', 'DOCKER_CONTEXT', 'DOCKER_CONFIG', 'DOCKER_TLS_VERIFY', 'DOCKER_CERT_PATH', 'XDG_RUNTIME_DIR'].includes(key)))
-          });
-        } catch (error) {
-          const timeout = error.killed ? ' Se agotó el tiempo; comprueba el contenedor antes de repetir.' : '';
-          return send(res, 502, { error: `No se pudo confirmar la recreación del bot. Comprueba Docker Compose y los permisos del usuario del panel.${timeout} La configuración sigue guardada.` });
-        }
-        return send(res, 200, { ok: true, message: `${project.name}: contenedor recreado con la configuración guardada. Esto no confirma la conexión a Discord.` });
-      } finally { saving = false; }
+      const result = await operations.restart(project, req.headers['x-panel-revision']);
+      return send(res, 200, { ok: true, ...result });
     }
     if (url.pathname === '/api/config' && (!project || !project.path)) return send(res, 404, { error: 'Bot no integrado o desconocido.' });
     if (url.pathname === '/api/config' && req.method === 'GET') {
@@ -109,20 +94,12 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/api/config' && req.method === 'PUT') {
       if (req.headers['x-panel-csrf'] !== csrf) return send(res, 403, { error: 'Recarga el panel para guardar.' });
-      if (saving) return send(res, 409, { error: 'Hay otro guardado o reinicio en curso.' });
-      saving = true;
-      try {
-        let body = '';
-        for await (const chunk of req) { body += chunk; if (Buffer.byteLength(body) > 64000) return send(res, 413, { error: 'Petición demasiado grande.' }); }
-        const input = JSON.parse(body);
-        const current = await readEnv(project);
-        if (input.revision !== revision(current)) return send(res, 409, { error: 'La configuración ha cambiado. Recarga antes de guardar.' });
-        const next = update(current, input.changes, project.modules);
-        const temp = `${project.path}.${randomBytes(8).toString('hex')}.tmp`;
-        try { await writeFile(temp, next, { mode: 0o600, flag: 'wx' }); await rename(temp, project.path); }
-        finally { await unlink(temp).catch(() => {}); }
-        return send(res, 200, { ok: true, message: project.manualRestart ? 'Guardado. Reinicia manualmente el servicio systemd correspondiente para aplicar los cambios. La conexión del chat también requiere PANEL_AGENT_URL y PANEL_AGENT_TOKEN en el entorno del panel.' : 'Guardado. Recrea el contenedor del bot para aplicar los cambios.' });
-      } finally { saving = false; }
+      if (operations.isBusy()) return send(res, 409, { error: 'Hay otro guardado o reinicio en curso.' });
+      let body = '';
+      for await (const chunk of req) { body += chunk; if (Buffer.byteLength(body) > 64000) return send(res, 413, { error: 'Petición demasiado grande.' }); }
+      const input = JSON.parse(body);
+      await operations.save(project, input.revision, input.changes);
+      return send(res, 200, { ok: true, message: project.manualRestart ? 'Guardado. Reinicia el servicio systemd correspondiente para aplicar los cambios.' : 'Guardado. Recrea el contenedor del bot para aplicar los cambios.' });
     }
     const files = { '/agent.js': ['agent.js', 'text/javascript'], '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/help.js': ['help.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'], '/logo.png': ['logo.png', 'image/png'] };
     if (req.method === 'GET' && files[req.url]) {
@@ -130,7 +107,7 @@ const server = http.createServer(async (req, res) => {
       res.setHeader('Content-Type', type.startsWith('text/') ? `${type}; charset=utf-8` : type); return res.end(await readFile(join(here, 'public', file)));
     }
     send(res, 404, { error: 'No encontrado.' });
-  } catch (error) { send(res, 400, { error: error.code ? 'No se pudo acceder a la configuración. Comprueba permisos y rutas.' : error.message }); }
+  } catch (error) { send(res, error.status || 400, { error: error.code ? 'No se pudo acceder a la configuración. Comprueba permisos y rutas.' : error.message }); }
 });
 return server;
 }
