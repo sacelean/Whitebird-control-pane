@@ -127,7 +127,18 @@ puedan seguir leyéndolos. No des acceso al archivo de sesión OAuth al panel.
 Guardar no reinicia estos servicios. Como administrador, aplica los cambios con
 `sudo systemctl restart whitebird-ai-agent` o
 `sudo systemctl restart whitebird-ai-discord`, según el archivo modificado.
-El panel no añade reglas sudo ni ejecuta systemctl. Si cambias el secreto o el
+El selector mantiene este procedimiento manual. Para permitir reinicios confirmados
+mediante propuestas del chat, configura `PANEL_SYSTEMD_RESTART_ENABLED=true` y
+los tokens de herramientas descritos en [la guía del asistente](../docs/ai-agent.md).
+El backend ejecuta directamente `systemctl restart` únicamente para esas dos
+unidades fijas; también consulta estado y logs para el diagnóstico. El panel no
+instala reglas de autorización ni antepone `sudo`: las reglas sudoers de despliegue
+anteriores solo autorizan operaciones sobre el propio panel, no estos reinicios.
+El administrador debe proporcionar al usuario del servicio permisos efectivos
+para las operaciones habilitadas y acceso al journal. Verifica esos permisos
+con el usuario real del panel antes de usar el flujo.
+
+Si cambias el secreto o el
 puerto compartido, actualiza también sus consumidores (`PANEL_AGENT_TOKEN`,
 `PANEL_AGENT_URL`, `AGENT_API_TOKEN` y `DISCORD_AGENT_URL`) antes de verificar.
 El registro de `/whitebird-ask` y el login OAuth se realizan desde el proyecto

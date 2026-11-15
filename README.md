@@ -1,6 +1,6 @@
 # Whitebird · Centro de control
 
-Proyecto independiente para administrar WoW Role Sync, Recruitment, Ruleta y Whitebird IA mediante un selector, con archivos de configuración separados. Permite recrear los bots con Docker Compose cuando se habilita esa opción; los componentes IA se aplican manualmente con systemd.
+Proyecto independiente para administrar WoW Role Sync, Recruitment, Ruleta y Whitebird IA mediante un selector, con archivos de configuración separados. Permite recrear los bots con Docker Compose cuando se habilita esa opción; los componentes IA se aplican con systemd, manualmente o mediante propuestas confirmadas en el chat cuando se habilita esa opción.
 
 ## Organización independiente
 
@@ -47,7 +47,7 @@ Ejecuta el panel en el host que contiene el `.env` del bot y su carpeta `data/`,
 - Lee la base `DATABASE_PATH` indicada en ese `.env`, relativa al directorio del bot. Por defecto usa `data/whitebird-wow-roles.sqlite`. Abre SQLite exclusivamente en lectura, sin importar el módulo de migraciones del bot.
 - Muestra vinculaciones, canales, reparto de calderos, destino del informe y los diez cambios de roles más recientes del servidor configurado.
 - Los secretos nunca se devuelven al navegador; se pueden sustituir o eliminar explícitamente.
-- Valida tipos, IDs, JSON, horario y roles duplicados. La existencia, permisos y jerarquía de roles se comprueban en el bot al sincronizar, no desde este panel.
+- Valida tipos, IDs, JSON, horario y roles duplicados. El guardado no consulta Discord. El asistente dispone de una herramienta separada para comprobar permisos efectivos, existencia y jerarquía de roles en Discord; el bot conserva sus comprobaciones al sincronizar.
 - Rechaza guardados con revisión obsoleta y serializa las escrituras del propio panel. Evita editar el `.env` simultáneamente con herramientas externas durante un guardado.
 - Guarda con reemplazo atómico y permisos 0600. No modifica SQLite ni aplica migraciones.
 
@@ -65,7 +65,7 @@ Cada campo dispone de un icono de información con una explicación de su uso. L
 
 Discord, sincronización, roster y WoWAudit tienen formularios con las variables que el bot consume. Roster se desactiva vaciando su ID; WoWAudit se desactiva eliminando su API key (afecta tanto al informe como a los avisos). No existen interruptores independientes para todas las funciones actuales.
 
-Calderos muestra el reparto y panel guardados. Las asignaciones se cambian únicamente en Discord con `/calderos-asignar`, que actualiza el mensaje del reparto automáticamente. Usa `/calderos-publicar` para publicar o mover ese mensaje. El destino de raiders se establece con `/informe-raiders`. BIS y ascensos muestran las instrucciones de gestión. Recruitment incluye sus propias credenciales, categorías, transcripciones, mensajes, cinco preguntas y conexión compartida con WoW Sync. Su SQLite muestra el panel de solicitudes publicado. No almacena un historial de applies en su esquema actual.
+Calderos muestra el reparto y panel guardados. Las asignaciones se cambian únicamente en Discord con `/calderos-asignar`, que actualiza el mensaje del reparto automáticamente. Usa `/calderos-publicar` para publicar o mover ese mensaje. El destino de raiders se establece con `/informe-raiders`. BIS y ascensos muestran las instrucciones de gestión. Recruitment incluye sus propias credenciales, categorías, transcripciones, mensajes, cinco preguntas y conexión compartida con WoW Sync. Su SQLite muestra el panel de solicitudes publicado y, cuando existe la tabla `recruitment_decisions`, el registro de decisiones de aceptación y rechazo. No reconstruye decisiones anteriores a la incorporación de ese registro.
 
 `WOW_ROLE_SYNC_DATA_DIR` es una carpeta del host usada por Docker Compose. `WOW_ROLE_SYNC_DATABASE_PATH` es una ruta del proceso para ejecución directa; Compose la sobrescribe con `/app/wow-role-sync-data/whitebird-wow-roles.sqlite`. Las rutas del contenedor pueden no existir en el host: el panel mostrará SQLite no disponible si `DATABASE_PATH` apunta a una ruta inaccesible.
 
@@ -76,6 +76,25 @@ Ejemplo con rutas explícitas:
 ```sh
 PANEL_ENV_PATH=/ruta/wow/.env PANEL_RECRUITMENT_ENV_PATH=/ruta/recruitment/.env npm start
 ```
+
+## Vista previa y registros
+
+WoW Role Sync incluye una vista previa del informe diario: consulta datos actuales
+con el módulo de sincronización del bot instalado, en un proceso aislado con un
+límite de dos minutos. Necesita acceso al código del bot, sus dependencias,
+SQLite y los servicios externos configurados. No modifica roles, canales ni SQLite,
+ni simula felicitaciones o fallos al aplicar cambios.
+
+La actividad guardada permite buscar y filtrar roles, propuestas y ediciones BIS,
+ascensos y versiones, con páginas de 50 filas y alcance del servidor configurado.
+BIS y ascensos muestran el último estado del registro; no es una auditoría completa
+de cada transición ni incluye los logs de Docker.
+
+Recruitment muestra decisiones en bloques de 100, con fecha, personaje, candidato,
+oficial, motivo, estado del proceso y pasos de vinculación y canal Raider. Son
+registros del bot, no una comprobación actual en Discord. Si falta la tabla o la
+base no es accesible, se informa de que el registro no está disponible. Todas
+estas consultas SQLite son de solo lectura y no crean ni migran tablas.
 
 ## Verificación
 
@@ -146,8 +165,11 @@ porque usan archivos independientes:
 Los archivos deben existir; el panel no crea credenciales ni sesiones OAuth.
 No se consulta SQLite para estos componentes. Los secretos no se devuelven al
 navegador. Guardar modifica solo el archivo del componente seleccionado.
-Después aplica manualmente los cambios reiniciando `whitebird-ai-agent` o
-`whitebird-ai-discord` con systemd; el botón Docker queda deshabilitado.
+Después aplica los cambios reiniciando `whitebird-ai-agent` o
+`whitebird-ai-discord` con systemd. Desde el selector el reinicio es manual y el
+botón Docker queda deshabilitado. El chat permite confirmar el reinicio si
+`PANEL_SYSTEMD_RESTART_ENABLED=true` y el usuario del panel tiene permisos sobre
+las unidades correspondientes.
 El usuario de los servicios debe poder leer los archivos tras guardarlos (0600).
 
 El chat emergente sigue siendo global e independiente del selector. Para
@@ -157,10 +179,10 @@ cambios al panel ni al otro componente: actualiza sus URL y secretos coincidente
 El login OAuth se hace fuera del panel, con el servicio IA detenido.
 Los formularios no acreditan disponibilidad del agente, Discord, modelo u OAuth.
 
-Campos contrastados el 2026-11-14 con `.env.example`, `src/server.js`,
-`src/agent.js`, `src/discord.js` y `deploy/whitebird-ai-agent.service` de la copia
-local del agente. El main remoto revisado aún no contiene los adaptadores;
-verifica la revisión instalada antes de aplicar o desplegar.
+Los adaptadores de configuración están implementados en esta copia del panel.
+Comprueba la revisión y los archivos de entorno que usan los servicios instalados
+antes de aplicar cambios; los formularios no acreditan compatibilidad con cualquier
+revisión del agente.
 
 
 ## Investigar errores desde el asistente
@@ -193,3 +215,17 @@ El backend expone herramientas autenticadas de lectura para decisiones de
 Recruitment y registros de WoW Sync. Usa las rutas y credenciales del panel ya
 configuradas. No modifica datos ni devuelve transcripciones o motivos de rechazo.
 Ver [herramientas, filtros y alcance](docs/bot-data.md).
+
+## Estado de esta documentación
+
+Revisada el 2026-11-15 contra el código del panel, incluida la revisión `8b45a2d`
+de `origin/main`, y los cinco documentos de entrada de
+[Whitebird-context](https://github.com/sacelean/Whitebird-context).
+No se ha inspeccionado la VM ni comprobado el despliegue o la salud de los
+servicios durante esta revisión.
+
+La ayuda del chatbot es un producto separado de estas guías Markdown. Cada
+origen publica `docs/knowledge.json` en su rama `knowledge-published`;
+Whitebird-context recoge las publicaciones con GitHub Actions y el agente lee
+el catálogo local generado. Editar este README no actualiza por sí solo las
+respuestas del chatbot.

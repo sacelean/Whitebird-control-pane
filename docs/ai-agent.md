@@ -1,6 +1,11 @@
 # Consulta al agente de IA
 
-Integración implementada el 2026-11-14; pendiente de despliegue y validación real.
+Documentación revisada el 2026-11-15 contra el código del panel, incluida la
+revisión `8b45a2d` de `origin/main`, y el contexto compartido de Whitebird.
+La ayuda del chatbot usa un catálogo de conocimiento separado de estas guías;
+ver [publicación del conocimiento](context-publication.md).
+No se ha inspeccionado la VM en esta revisión: comprueba la revisión instalada
+y valida las conexiones reales antes de dar por operativo el flujo.
 
 El formulario «Consultar al agente de IA» envía preguntas a la API del panel,
 que las reenvía al servicio local whitebird-ai-agent. WoWAudit sigue en modo
@@ -78,14 +83,16 @@ real. El diagnóstico no inicia login OAuth ni consultas MCP.
 La respuesta contiene comprobaciones y pasos concretos. Los logs se clasifican
 por patrones conocidos de autenticación, permisos, conexión, archivos, puertos,
 OAuth y timeout. No se devuelven líneas, valores de configuración, rutas privadas
-ni excepciones. No se envían logs ni configuración al modelo. El texto se muestra
+ni excepciones. En este recorrido de diagnóstico local no se envían logs ni configuración al modelo.
+El recorrido de administración asistida puede enviar logs redactados al modelo,
+como se describe más abajo. El texto se muestra
 con textContent. La ruta /api/agent conserva Host/Origin y CSRF y devuelve el
 contrato {tool, answer}, con tool=panel_diagnostics para estas consultas.
 
-El diagnóstico refleja archivos guardados y evidencia puntual. No determina si
+El diagnóstico local refleja archivos guardados y evidencia puntual. No determina si
 hay cambios pendientes de aplicar ni comprueba los permisos efectivos de Discord.
-Los logs pueden contener errores históricos. Las correcciones se realizan desde
-los formularios y procedimientos existentes. Ejecutar npm test y comprobar el
+Los logs pueden contener errores históricos. Las correcciones pueden realizarse desde
+los formularios o mediante las propuestas confirmadas de administración asistida. Ejecutar npm test y comprobar el
 chat en la instalación destino antes de dar por verificado el despliegue.
 
 
@@ -101,7 +108,8 @@ Los errores, logs y solicitudes explícitas de diagnóstico mantienen el recorri
 local. La ayuda usa resúmenes documentados en whitebird-ai-agent y requiere una
 revisión del agente con project-help.js y project-knowledge.js. Responde con
 {tool: null, answer}. Para cuestiones de funcionamiento en Discord, indica el
-nombre del bot o un comando. La ayuda no consulta la configuración efectiva.
+nombre del bot o un comando. Ese recorrido de ayuda no consulta la configuración efectiva; las herramientas de
+administración descritas a continuación sí permiten leer el archivo registrado.
 
 
 ## Administración asistida (2026-11-15)
