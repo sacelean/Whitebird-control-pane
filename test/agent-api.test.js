@@ -38,3 +38,27 @@ test('agent proxy rejects remote endpoints and sanitizes upstream failures', asy
     assert.ok(!JSON.stringify(result).includes(token));
   }
 });
+
+
+test('explanations reach the shared agent with selected project while errors stay local', async () => {
+  let diagnosed = 0;
+  let forwarded = 0;
+  const api = createAgentApi({ url: 'http://127.0.0.1:3090', token,
+    diagnose: async () => { diagnosed++; return { tool: 'panel_diagnostics', answer: 'Diagnóstico' }; },
+    fetchFn: async (_url, options) => {
+      forwarded++;
+      assert.equal(JSON.parse(options.body).project, 'roulette');
+      return { ok: true, json: async () => ({ tool: null, answer: 'Ayuda de ruleta' }) };
+    }
+  });
+  for (const question of ['¿Cómo funciona?', '¿Qué permisos necesita la ruleta?', '¿Cómo configurar la ruleta?']) {
+    const result = await request(api, { question, project: 'roulette' });
+    assert.equal(result.data.answer, 'Ayuda de ruleta');
+  }
+  for (const question of ['La ruleta no funciona', 'Revisa los errores de la ruleta', 'Diagnostica permisos de ruleta']) {
+    const result = await request(api, { question, project: 'roulette' });
+    assert.equal(result.data.tool, 'panel_diagnostics');
+  }
+  assert.equal(forwarded, 3);
+  assert.equal(diagnosed, 3);
+});

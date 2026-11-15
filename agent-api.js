@@ -1,6 +1,8 @@
 export function isDiagnosticQuestion(question) {
   const text = question.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
-  return /diagnost|configura|misconfig|missconfig|no (?:arranca|funciona|conecta|responde)|\blogs?\b|\berrores?\b|\bfalla\b|\bfallos?\b|\bpermisos?\b|\bpuertos?\b|\btokens?\b|estado.*(?:bot|servicio|panel|agente)/.test(text);
+  if (/diagnost|misconfig|missconfig|no (?:arranca|funciona|conecta|responde)|\blogs?\b|\berrores?\b|\bfalla\b|\bfallos?\b/.test(text)) return true;
+  if (/como|explica|que (?:hace|es|significa|permisos|comandos)|para que|funciona|ayuda/.test(text)) return false;
+  return /configura|\bpermisos?\b|\bpuertos?\b|\btokens?\b|estado.*(?:bot|servicio|panel|agente)/.test(text);
 }
 
 // Installed in the root of Whitebird-control-pane. Token stays on the server.
@@ -41,7 +43,7 @@ export function createAgentApi({ url = process.env.PANEL_AGENT_URL, token = proc
       const response = await fetchFn(new URL('/ask', endpoint), {
         method: 'POST', redirect: 'error', signal: AbortSignal.timeout(300000),
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ question: input.question.trim() })
+        body: JSON.stringify({ question: input.question.trim(), ...(typeof input.project === 'string' && input.project ? { project: input.project } : {}) })
       });
       if (response.status === 429) return send(res, 429, { error: 'El agente está ocupado. Vuelve a intentarlo cuando termine.' });
       if (!response.ok) throw new Error('Agent unavailable');

@@ -32,7 +32,7 @@ async function init() {
     const response = await fetch('/api/agent');
     if (!response.ok) throw Error();
     const data = await response.json(); csrf = data.csrf; enabled = data.enabled === true;
-    status.textContent = enabled ? (data.wowaudit ? 'Puedes pedir un diagnóstico del panel o consultar WoWAudit.' : 'Diagnóstico local disponible. Para consultar WoWAudit, configura la conexión del agente.') : 'El chat está disponible, pero falta conectar el servicio de IA. Configura PANEL_AGENT_URL y PANEL_AGENT_TOKEN en el servidor del panel y reinícialo.';
+    status.textContent = enabled ? (data.wowaudit ? 'Puedes preguntar cómo funcionan los bots, pedir un diagnóstico o consultar WoWAudit.' : 'Diagnóstico local disponible. Para consultar WoWAudit, configura la conexión del agente.') : 'El chat está disponible, pero falta conectar el servicio de IA. Configura PANEL_AGENT_URL y PANEL_AGENT_TOKEN en el servidor del panel y reinícialo.';
   } catch { status.textContent = 'No se pudo comprobar la conexión del agente. Vuelve a comprobarla.'; }
   submit.disabled = !enabled; question.disabled = !enabled; retry.hidden = enabled;
 }

@@ -87,3 +87,18 @@ hay cambios pendientes de aplicar ni comprueba los permisos efectivos de Discord
 Los logs pueden contener errores históricos. Las correcciones se realizan desde
 los formularios y procedimientos existentes. Ejecutar npm test y comprobar el
 chat en la instalación destino antes de dar por verificado el despliegue.
+
+
+## Explicaciones del funcionamiento (2026-11-15)
+
+Preguntas como «¿Cómo funciona Recruitment?», «¿Qué permisos necesita la
+ruleta?» y «¿Cómo se configuran los roles de WoW Role Sync?» se envían al
+agente compartido. El proyecto seleccionado se transmite como contexto opcional
+project para preguntas como «¿Cómo funciona?» sin nombre de bot. Los nombres
+explícitos en la pregunta tienen prioridad. El historial continúa siendo visual.
+
+Los errores, logs y solicitudes explícitas de diagnóstico mantienen el recorrido
+local. La ayuda usa resúmenes documentados en whitebird-ai-agent y requiere una
+revisión del agente con project-help.js y project-knowledge.js. Responde con
+{tool: null, answer}. Para cuestiones de funcionamiento en Discord, indica el
+nombre del bot o un comando. La ayuda no consulta la configuración efectiva.
